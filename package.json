@@ -1,0 +1,8 @@
+{
+  "dependencies": {
+    "@prisma/client": "^6.8.2",
+    "lucide-react": "^0.511.0",
+    "prisma": "^6.8.2",
+    "socket.io": "^4.8.1"
+  }
+}
