@@ -1,7 +1,6 @@
 "use client"
 
 import type React from "react"
-
 import { useEffect, useState } from "react"
 import { useAuth } from "@/contexts/AuthContext"
 import { useRouter } from "next/navigation"
@@ -15,13 +14,18 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Progress } from "@/components/ui/progress"
 import { Upload, FileText, ImageIcon, File, AlertCircle, X } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { supabase } from "@/lib/supabase"
 
 export default function UploadPage() {
-  const { user, loading, signOut } = useAuth()
+  const { user, loading } = useAuth()
   const router = useRouter()
   const [files, setFiles] = useState<File[]>([])
   const [uploading, setUploading] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
+  const [selectedDocType, setSelectedDocType] = useState<string | undefined>()
+  const [title, setTitle] = useState("")
+  const [description, setDescription] = useState("")
+  const [tags, setTags] = useState("")
 
   useEffect(() => {
     if (!loading && !user) {
@@ -29,9 +33,7 @@ export default function UploadPage() {
     }
   }, [user, loading, router])
 
-  if (loading || !user) {
-    return null
-  }
+  if (loading || !user) return null
 
   const documentTypes = [
     "Cédula de Identidad",
@@ -52,21 +54,84 @@ export default function UploadPage() {
     setFiles((prev) => prev.filter((_, i) => i !== index))
   }
 
+  // Opcional: función para calcular SHA256 del archivo (puedes omitirlo o agregarla luego)
+  // async function calculateChecksum(file: File): Promise<string> {
+  //   // Implementar si deseas validar integridad
+  //   return ""
+  // }
+
   const handleUpload = async () => {
+    if (!selectedDocType) {
+      alert("Por favor, selecciona el tipo de documento")
+      return
+    }
+    if (!title.trim()) {
+      alert("Por favor, ingresa el título del documento")
+      return
+    }
+    if (files.length === 0) {
+      alert("Por favor, selecciona al menos un archivo para subir")
+      return
+    }
+
     setUploading(true)
     setUploadProgress(0)
 
-    // Simular progreso de subida
-    const interval = setInterval(() => {
-      setUploadProgress((prev) => {
-        if (prev >= 100) {
-          clearInterval(interval)
-          setUploading(false)
-          return 100
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i]
+      try {
+        const filePath = `public/${user.id}/${Date.now()}_${file.name}`
+
+        // al storage 
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from("archivos")
+          .upload(filePath, file)
+
+        if (uploadError) {
+          throw new Error(uploadError.message)
         }
-        return prev + 10
-      })
-    }, 200)
+
+        // aqui el insert  
+        const { error: insertError } = await supabase
+          .from("documents")
+          .insert({
+            owner_id: user.id,
+            title: title,
+            description: description || null,
+            doc_type: selectedDocType,
+            tags: tags
+              ? tags
+                  .split(",")
+                  .map((tag) => tag.trim())
+                  .filter((tag) => tag.length > 0)
+              : [],
+            mime_type: file.type,
+            file_size: file.size,
+            file_path: filePath,
+            checksum_sha256: "", 
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          })
+
+        if (insertError) {
+          throw new Error(insertError.message)
+        }
+
+        setUploadProgress(Math.round(((i + 1) / files.length) * 100))
+      } catch (error: any) {
+        alert(`Error al subir ${file.name}: ${error.message || error}`)
+        console.error(error)
+      }
+    }
+
+    setUploading(false)
+    alert("Todos los archivos fueron subidos correctamente")
+    setFiles([])
+    setTitle("")
+    setDescription("")
+    setTags("")
+    setSelectedDocType(undefined)
+    setUploadProgress(0)
   }
 
   const getFileIcon = (file: File) => {
@@ -139,7 +204,7 @@ export default function UploadPage() {
             <CardContent className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="document-type">Tipo de Documento</Label>
-                <Select>
+                <Select onValueChange={(val) => setSelectedDocType(val)} value={selectedDocType}>
                   <SelectTrigger>
                     <SelectValue placeholder="Selecciona el tipo" />
                   </SelectTrigger>
@@ -155,17 +220,33 @@ export default function UploadPage() {
 
               <div className="space-y-2">
                 <Label htmlFor="document-title">Título del Documento</Label>
-                <Input id="document-title" placeholder="Ej: Cédula de Identidad - Juan Pérez" />
+                <Input
+                  id="document-title"
+                  placeholder="Ej: Cédula de Identidad - Juan Pérez"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                />
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="document-description">Descripción (Opcional)</Label>
-                <Textarea id="document-description" placeholder="Descripción adicional del documento..." rows={3} />
+                <Textarea
+                  id="document-description"
+                  placeholder="Descripción adicional del documento..."
+                  rows={3}
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                />
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="tags">Etiquetas (Opcional)</Label>
-                <Input id="tags" placeholder="personal, importante, legal" />
+                <Input
+                  id="tags"
+                  placeholder="personal, importante, legal"
+                  value={tags}
+                  onChange={(e) => setTags(e.target.value)}
+                />
               </div>
             </CardContent>
           </Card>
@@ -175,8 +256,7 @@ export default function UploadPage() {
         <Alert>
           <AlertCircle className="h-4 w-4" />
           <AlertDescription>
-            Todos los documentos son encriptados automáticamente antes del almacenamiento. Solo tú y las personas
-            autorizadas pueden acceder a ellos.
+            Todos los documentos son encriptados automáticamente antes del almacenamiento. Solo tú y las personas autorizadas pueden acceder a ellos.
           </AlertDescription>
         </Alert>
 
@@ -197,7 +277,7 @@ export default function UploadPage() {
 
         {/* Upload Button */}
         <div className="flex justify-end space-x-2">
-          <Button variant="outline" disabled={uploading}>
+          <Button variant="outline" disabled={uploading} onClick={() => router.push("/")}>
             Cancelar
           </Button>
           <Button onClick={handleUpload} disabled={files.length === 0 || uploading}>
