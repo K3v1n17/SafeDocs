@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Button } from "@/components/ui/button"
 import {
   History,
   Search,
@@ -21,17 +22,32 @@ import {
   User,
   FileText,
   Clock,
-} from "lucide-react"
+  Edit,
+  Save,
+  X,
+} from "lucide-react" 
+import { supabase } from "@/lib/supabase"
+
+interface Document {
+  id: string
+  title: string
+  description: string | null
+  doc_type: string | null
+  mime_type: string
+  file_size: number
+  created_at: string
+  updated_at: string
+}
 
 interface HistoryEntry {
-  id: string
+  id: number
   action: "upload" | "download" | "share" | "verify" | "view" | "delete"
-  document: string
-  user: string
-  timestamp: Date
-  details: string
-  ipAddress: string
-  userAgent: string
+  document_id: string | null
+  user_id: string | null
+  details: string | null
+  ip_address: string | null
+  user_agent: string | null
+  created_at: string
 }
 
 export default function HistoryPage() {
@@ -40,6 +56,11 @@ export default function HistoryPage() {
   const [searchTerm, setSearchTerm] = useState("")
   const [filterAction, setFilterAction] = useState("all")
   const [filterDate, setFilterDate] = useState("all")
+  const [historyEntries, setHistoryEntries] = useState<HistoryEntry[]>([])
+  const [documents, setDocuments] = useState<Document[]>([])
+  const [loadingData, setLoadingData] = useState(true)
+  const [editingDoc, setEditingDoc] = useState<string | null>(null)
+  const [editTitle, setEditTitle] = useState("")
 
   useEffect(() => {
     if (!loading && !user) {
@@ -47,72 +68,129 @@ export default function HistoryPage() {
     }
   }, [user, loading, router])
 
-  if (loading || !user) {
-    return null
+  useEffect(() => {
+    if (user) {
+      fetchData()
+    }
+  }, [user])
+
+  const fetchData = async () => {
+    try {
+      setLoadingData(true)
+      
+      
+      const { data: documentsData, error: documentsError } = await supabase
+        .from('documents')
+        .select('*')
+        .eq('owner_id', user?.id)
+        .order('created_at', { ascending: false })
+
+      if (documentsError) {
+        console.error('Error fetching documents:', documentsError)
+        return
+      }
+
+    
+      const { data: historyData, error: historyError } = await supabase
+        .from('history')
+        .select('*')
+        .eq('user_id', user?.id)
+        .order('created_at', { ascending: false })
+
+      if (historyError) {
+        console.error('Error fetching history:', historyError)
+        return
+      }
+
+      setHistoryEntries(historyData || [])
+      setDocuments(documentsData || [])
+    } catch (error) {
+      console.error('Error:', error)
+    } finally {
+      setLoadingData(false)
+    }
   }
 
-  const historyEntries: HistoryEntry[] = [
-    {
-      id: "1",
-      action: "upload",
-      document: "Cédula_Identidad.pdf",
-      user: "Usuario Safedocs",
-      timestamp: new Date("2024-06-01T10:30:00"),
-      details: "Documento subido exitosamente",
-      ipAddress: "192.168.1.100",
-      userAgent: "Chrome 125.0.0.0",
-    },
-    {
-      id: "2",
-      action: "verify",
-      document: "Cédula_Identidad.pdf",
-      user: "Sistema",
-      timestamp: new Date("2024-06-01T10:31:00"),
-      details: "Verificación automática completada - Documento íntegro",
-      ipAddress: "Sistema",
-      userAgent: "Sistema",
-    },
-    {
-      id: "3",
-      action: "share",
-      document: "Contrato_Arrendamiento.pdf",
-      user: "Usuario Safedocs",
-      timestamp: new Date("2024-06-01T14:15:00"),
-      details: "Documento compartido con ana@email.com",
-      ipAddress: "192.168.1.100",
-      userAgent: "Chrome 125.0.0.0",
-    },
-    {
-      id: "4",
-      action: "view",
-      document: "Contrato_Arrendamiento.pdf",
-      user: "Ana García",
-      timestamp: new Date("2024-06-01T15:22:00"),
-      details: "Documento visualizado desde enlace compartido",
-      ipAddress: "203.0.113.45",
-      userAgent: "Safari 17.4.1",
-    },
-    {
-      id: "5",
-      action: "download",
-      document: "Pasaporte.jpg",
-      user: "Usuario Safedocs",
-      timestamp: new Date("2024-06-01T16:45:00"),
-      details: "Descarga autorizada del documento",
-      ipAddress: "192.168.1.100",
-      userAgent: "Chrome 125.0.0.0",
-    },
-    {
-      id: "6",
-      action: "verify",
-      document: "Título_Propiedad.pdf",
-      user: "Sistema",
-      timestamp: new Date("2024-06-01T18:00:00"),
-      details: "Verificación programada - Se detectaron modificaciones",
-      ipAddress: "Sistema",
-      userAgent: "Sistema",
-    },
-  ]
+  const handleDeleteDocument = async (documentId: string, documentTitle: string) => {
+    if (!confirm(`¿Estás seguro de que quieres eliminar el documento "${documentTitle}"?`)) {
+      return
+    }
+
+    try {
+      const { error } = await supabase
+        .from('documents')
+        .delete()
+        .eq('id', documentId)
+        .eq('owner_id', user?.id)
+
+      if (error) {
+        alert('Error al eliminar el documento: ' + error.message)
+        return
+      }
+
+      alert('Documento eliminado exitosamente')
+      await fetchData() 
+    } catch (error) {
+      console.error('Error deleting document:', error)
+      alert('Error al eliminar el documento')
+    }
+  }
+
+  const handleEditDocument = async (documentId: string, newTitle: string) => {
+    if (!newTitle.trim()) {
+      alert('El título no puede estar vacío')
+      return
+    }
+
+    try {
+      const { error } = await supabase
+        .from('documents')
+        .update({ 
+          title: newTitle.trim(),
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', documentId)
+        .eq('owner_id', user?.id)
+
+      if (error) {
+        alert('Error al actualizar el documento: ' + error.message)
+        return
+      }
+
+      alert('Documento actualizado exitosamente')
+      setEditingDoc(null)
+      setEditTitle("")
+      await fetchData() 
+    } catch (error) {
+      console.error('Error updating document:', error)
+      alert('Error al actualizar el documento')
+    }
+  }
+
+  const startEdit = (doc: Document) => {
+    setEditingDoc(doc.id)
+    setEditTitle(doc.title)
+  }
+
+  const cancelEdit = () => {
+    setEditingDoc(null)
+    setEditTitle("")
+  }
+
+  if (loading || loadingData) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
+          <p className="mt-2 text-muted-foreground">Cargando...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (!user) {
+    return null
+  }
 
   const getActionIcon = (action: string) => {
     switch (action) {
@@ -156,17 +234,20 @@ export default function HistoryPage() {
   }
 
   const filteredEntries = historyEntries.filter((entry) => {
+    const document = documents.find(doc => doc.id === entry.document_id)
+    const documentTitle = document?.title || "Documento eliminado"
+    const details = entry.details || ""
+
     const matchesSearch =
-      entry.document.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      entry.user.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      entry.details.toLowerCase().includes(searchTerm.toLowerCase())
+      documentTitle.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      details.toLowerCase().includes(searchTerm.toLowerCase())
 
     const matchesAction = filterAction === "all" || entry.action === filterAction
 
     const matchesDate =
       filterDate === "all" ||
       (() => {
-        const entryDate = entry.timestamp
+        const entryDate = new Date(entry.created_at)
         const now = new Date()
 
         switch (filterDate) {
@@ -250,6 +331,83 @@ export default function HistoryPage() {
           </Card>
         </div>
 
+        {/* Documents Management */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Mis Documentos</CardTitle>
+            <CardDescription>
+              {documents.length} documentos en total
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {documents.map((doc) => (
+                <div key={doc.id} className="flex items-center justify-between p-4 border rounded-lg">
+                  <div className="flex-1">
+                    {editingDoc === doc.id ? (
+                      <div className="flex items-center gap-2">
+                        <Input
+                          value={editTitle}
+                          onChange={(e) => setEditTitle(e.target.value)}
+                          className="flex-1"
+                          placeholder="Título del documento"
+                        />
+                        <Button
+                          size="sm"
+                          onClick={() => handleEditDocument(doc.id, editTitle)}
+                          className="bg-green-600 hover:bg-green-700"
+                        >
+                          <Save className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={cancelEdit}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <div>
+                        <h3 className="font-medium">{doc.title}</h3>
+                        <p className="text-sm text-muted-foreground">
+                          {doc.doc_type} • {(doc.file_size / 1024 / 1024).toFixed(2)} MB
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                  
+                  {editingDoc !== doc.id && (
+                    <div className="flex items-center gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => startEdit(doc)}
+                      >
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        onClick={() => handleDeleteDocument(doc.id, doc.title)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              ))}
+
+              {documents.length === 0 && (
+                <div className="text-center py-8 text-muted-foreground">
+                  <FileText className="mx-auto h-12 w-12 mb-4 opacity-50" />
+                  <p>No tienes documentos subidos</p>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Filters */}
         <Card>
           <CardHeader>
@@ -311,45 +469,56 @@ export default function HistoryPage() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {filteredEntries.map((entry) => (
-                <div key={entry.id} className="flex items-start space-x-4 p-4 border rounded-lg">
-                  <div className="flex-shrink-0">{getActionIcon(entry.action)}</div>
+              {filteredEntries.map((entry) => {
+                const document = documents.find(doc => doc.id === entry.document_id)
+                return (
+                  <div key={entry.id} className="flex items-start space-x-4 p-4 border rounded-lg">
+                    <div className="flex-shrink-0">{getActionIcon(entry.action)}</div>
 
-                  <div className="flex-1 space-y-2">
-                    <div className="flex items-start justify-between">
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2">
-                          <p className="font-medium">{entry.document}</p>
-                          {getActionBadge(entry.action)}
+                    <div className="flex-1 space-y-2">
+                      <div className="flex items-start justify-between">
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <p className="font-medium">
+                              {document?.title || "Documento eliminado"}
+                            </p>
+                            {getActionBadge(entry.action)}
+                          </div>
+                          <p className="text-sm text-muted-foreground">
+                            {entry.details || "Sin detalles"}
+                          </p>
                         </div>
-                        <p className="text-sm text-muted-foreground">{entry.details}</p>
+
+                        <div className="text-right text-sm text-muted-foreground">
+                          <div className="flex items-center gap-1">
+                            <Clock className="h-3 w-3" />
+                            {new Date(entry.created_at).toLocaleString()}
+                          </div>
+                        </div>
                       </div>
 
-                      <div className="text-right text-sm text-muted-foreground">
+                      <div className="flex items-center gap-4 text-xs text-muted-foreground">
                         <div className="flex items-center gap-1">
-                          <Clock className="h-3 w-3" />
-                          {entry.timestamp.toLocaleString()}
+                          <User className="h-3 w-3" />
+                          Usuario
                         </div>
+                        {entry.ip_address && (
+                          <>
+                            <span>•</span>
+                            <span>IP: {entry.ip_address}</span>
+                          </>
+                        )}
+                        {entry.user_agent && (
+                          <>
+                            <span>•</span>
+                            <span>{entry.user_agent}</span>
+                          </>
+                        )}
                       </div>
-                    </div>
-
-                    <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                      <div className="flex items-center gap-1">
-                        <User className="h-3 w-3" />
-                        {entry.user}
-                      </div>
-                      {entry.ipAddress !== "Sistema" && (
-                        <>
-                          <span>•</span>
-                          <span>IP: {entry.ipAddress}</span>
-                          <span>•</span>
-                          <span>{entry.userAgent}</span>
-                        </>
-                      )}
                     </div>
                   </div>
-                </div>
-              ))}
+                )
+              })}
 
               {filteredEntries.length === 0 && (
                 <div className="text-center py-8 text-muted-foreground">

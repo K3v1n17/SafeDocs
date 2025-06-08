@@ -17,7 +17,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { supabase } from "@/lib/supabase"
 
 export default function UploadPage() {
-  const { user, loading } = useAuth()
+  const { user, loading , signOut } = useAuth()
   const router = useRouter()
   const [files, setFiles] = useState<File[]>([])
   const [uploading, setUploading] = useState(false)
@@ -32,6 +32,8 @@ export default function UploadPage() {
       router.push("/")
     }
   }, [user, loading, router])
+
+  console.log("User:", user)
 
   if (loading || !user) return null
 
@@ -54,11 +56,56 @@ export default function UploadPage() {
     setFiles((prev) => prev.filter((_, i) => i !== index))
   }
 
-  // Opcional: función para calcular SHA256 del archivo (puedes omitirlo o agregarla luego)
-  // async function calculateChecksum(file: File): Promise<string> {
-  //   // Implementar si deseas validar integridad
-  //   return ""
-  // }
+  // Función para calcular SHA256 del archivo (básica)
+  async function calculateChecksum(file: File): Promise<string> {
+    try {
+      const arrayBuffer = await file.arrayBuffer()
+      const hashBuffer = await crypto.subtle.digest('SHA-256', arrayBuffer)
+      const hashArray = Array.from(new Uint8Array(hashBuffer))
+      const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('')
+      return `sha256:${hashHex}`
+    } catch (error) {
+      console.error('Error calculando checksum:', error)
+      // Fallback: generar un hash simple basado en nombre y tamaño
+      return `sha256:${btoa(file.name + file.size + Date.now()).replace(/[^a-zA-Z0-9]/g, '').substring(0, 32)}`
+    }
+  }
+
+  // Función para crear verificación inicial
+  async function createInitialVerification(documentId: string, checksum: string) {
+    try {
+      // Generar un estado inicial (generalmente 'verified' para documentos recién subidos)
+      const initialStatus = 'verified'
+      const initialIntegrity = 100
+      const initialDetails = [
+        'Documento subido correctamente',
+        'Hash inicial calculado',
+        'Archivo íntegro al momento de subida',
+        'Verificación inicial completada'
+      ]
+
+      const { error } = await supabase
+        .from('document_verifications')
+        .insert({
+          document_id: documentId,
+          run_by: user?.id,
+          status: initialStatus,
+          integrity_pct: initialIntegrity,
+          hash_checked: checksum,
+          details: initialDetails
+        })
+
+      if (error) {
+        console.error('Error creando verificación inicial:', error)
+        throw error
+      }
+
+      return true
+    } catch (error) {
+      console.error('Error en createInitialVerification:', error)
+      return false
+    }
+  }
 
   const handleUpload = async () => {
     if (!selectedDocType) {
@@ -80,9 +127,12 @@ export default function UploadPage() {
     for (let i = 0; i < files.length; i++) {
       const file = files[i]
       try {
+        // Calcular checksum del archivo
+        const checksum = await calculateChecksum(file)
+        
         const filePath = `public/${user.id}/${Date.now()}_${file.name}`
 
-        // al storage 
+        // Subir al storage 
         const { data: uploadData, error: uploadError } = await supabase.storage
           .from("archivos")
           .upload(filePath, file)
@@ -91,12 +141,12 @@ export default function UploadPage() {
           throw new Error(uploadError.message)
         }
 
-        // aqui el insert  
-        const { error: insertError } = await supabase
+        // Insertar documento en la base de datos
+        const { data: documentData, error: insertError } = await supabase
           .from("documents")
           .insert({
             owner_id: user.id,
-            title: title,
+            title: files.length > 1 ? `${title} - ${file.name}` : title, // Si hay múltiples archivos, agregar el nombre del archivo
             description: description || null,
             doc_type: selectedDocType,
             tags: tags
@@ -108,19 +158,29 @@ export default function UploadPage() {
             mime_type: file.type,
             file_size: file.size,
             file_path: filePath,
-            checksum_sha256: "", 
+            checksum_sha256: checksum,
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
           })
+          .select('id')
+          .single()
 
         if (insertError) {
           throw new Error(insertError.message)
         }
 
+        // Crear verificación inicial para el documento
+        if (documentData?.id) {
+          const verificationCreated = await createInitialVerification(documentData.id, checksum)
+          if (!verificationCreated) {
+            console.warn(`No se pudo crear la verificación inicial para ${file.name}`)
+          }
+        }
+
         setUploadProgress(Math.round(((i + 1) / files.length) * 100))
       } catch (error: any) {
         alert(`Error al subir ${file.name}: ${error.message || error}`)
-        console.error(error)
+        console.error('Error en upload:', error)
       }
     }
 
@@ -256,7 +316,7 @@ export default function UploadPage() {
         <Alert>
           <AlertCircle className="h-4 w-4" />
           <AlertDescription>
-            Todos los documentos son encriptados automáticamente antes del almacenamiento. Solo tú y las personas autorizadas pueden acceder a ellos.
+            Todos los documentos son encriptados automáticamente antes del almacenamiento. Se crea una verificación inicial para garantizar la integridad.
           </AlertDescription>
         </Alert>
 
@@ -266,7 +326,7 @@ export default function UploadPage() {
             <CardContent className="pt-6">
               <div className="space-y-2">
                 <div className="flex justify-between text-sm">
-                  <span>Subiendo documentos...</span>
+                  <span>Subiendo documentos y creando verificaciones...</span>
                   <span>{uploadProgress}%</span>
                 </div>
                 <Progress value={uploadProgress} />

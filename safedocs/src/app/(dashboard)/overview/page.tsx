@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect } from "react"
+import { useEffect, useState } from "react"
 import { useAuth } from "@/contexts/AuthContext"
 import { useRouter } from "next/navigation"
 import { DashboardTitle } from "@/components/Sliderbar/DashboardTitle"
@@ -8,10 +8,16 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { FileText, Upload, Share2, Shield, Users } from "lucide-react"
 import { Progress } from "@/components/ui/progress"
+import { supabase } from "@/lib/supabase"
 
 export default function DashboardPage() {
-  const { user, loading, signOut } = useAuth()
+  const { user, loading } = useAuth()
   const router = useRouter()
+
+  const [documentCount, setDocumentCount] = useState(0)
+  const [sharedCount, setSharedCount] = useState(0)
+  const [verifiedCount, setVerifiedCount] = useState(0)
+  const [authorizedUsers, setAuthorizedUsers] = useState(0)
 
   useEffect(() => {
     if (!loading && !user) {
@@ -19,35 +25,71 @@ export default function DashboardPage() {
     }
   }, [user, loading, router])
 
-  if (loading || !user) {
-    return null
-  }
+  useEffect(() => {
+    const fetchStats = async () => {
+      if (!user) return
+
+      // Consulta de documentos subidos por el usuario
+      const { count: docs, error: docsError } = await supabase
+        .from("documents")
+        .select("*", { count: "exact", head: true })
+        .eq("owner_id", user.id)
+
+      // Consulta de documentos compartidos
+      const { count: shared, error: sharedError } = await supabase
+        .from("shared_links")
+        .select("*", { count: "exact", head: true })
+        .eq("owner_id", user.id)
+
+      // Consulta de documentos verificados
+      const { count: verified, error: verifiedError } = await supabase
+        .from("documents")
+        .select("*", { count: "exact", head: true })
+        .eq("owner_id", user.id)
+        .eq("verified", true)
+
+      // Consulta de usuarios autorizados por el usuario
+      const { count: authorized, error: authorizedError } = await supabase
+        .from("authorized_users")
+        .select("*", { count: "exact", head: true })
+        .eq("owner_id", user.id)
+
+      if (!docsError) setDocumentCount(docs || 0)
+      if (!sharedError) setSharedCount(shared || 0)
+      if (!verifiedError) setVerifiedCount(verified || 0)
+      if (!authorizedError) setAuthorizedUsers(authorized || 0)
+    }
+
+    fetchStats()
+  }, [user])
+
+  if (loading || !user) return null
 
   const stats = [
     {
       title: "Documentos Subidos",
-      value: "24",
+      value: documentCount.toString(),
       description: "Total de documentos",
       icon: FileText,
       trend: "+12% desde el mes pasado",
     },
     {
       title: "Documentos Compartidos",
-      value: "8",
+      value: sharedCount.toString(),
       description: "Enlaces activos",
       icon: Share2,
       trend: "+3 esta semana",
     },
     {
       title: "Verificaciones",
-      value: "156",
+      value: verifiedCount.toString(),
       description: "Documentos verificados",
       icon: Shield,
       trend: "+23% este mes",
     },
     {
       title: "Usuarios Autorizados",
-      value: "12",
+      value: authorizedUsers.toString(),
       description: "Acceso concedido",
       icon: Users,
       trend: "+2 nuevos",
@@ -86,7 +128,6 @@ export default function DashboardPage() {
       <DashboardTitle>Overview</DashboardTitle>
 
       <div className="flex-1 space-y-6 p-6">
-        {/* Stats Cards */}
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           {stats.map((stat, index) => (
             <Card key={index}>
@@ -104,7 +145,6 @@ export default function DashboardPage() {
         </div>
 
         <div className="grid gap-6 md:grid-cols-2">
-          {/* Storage Usage */}
           <Card>
             <CardHeader>
               <CardTitle>Uso de Almacenamiento</CardTitle>
@@ -122,7 +162,6 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
 
-          {/* Quick Actions */}
           <Card>
             <CardHeader>
               <CardTitle>Acciones Rápidas</CardTitle>
@@ -145,7 +184,6 @@ export default function DashboardPage() {
           </Card>
         </div>
 
-        {/* Recent Activity */}
         <Card>
           <CardHeader>
             <CardTitle>Actividad Reciente</CardTitle>
