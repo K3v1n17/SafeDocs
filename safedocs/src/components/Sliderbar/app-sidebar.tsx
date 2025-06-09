@@ -58,7 +58,7 @@ const data = {
       icon: CheckSquare,
     },
     {
-      title: "Historial",
+      title: "Mi Almacen",
       url: "/history",
       icon: BookOpen,
     },
