@@ -43,9 +43,9 @@ const data = {
       isActive: true,
     },
     {
-      title: "Subir Documentos",
-      url: "/upload",
-      icon: CloudUpload,
+      title: "Mi Almacen",
+      url: "/history",
+      icon: BookOpen,
     },
     {
       title: "Compartir Documentos",
@@ -57,11 +57,7 @@ const data = {
       url: "/verify",
       icon: CheckSquare,
     },
-    {
-      title: "Mi Almacen",
-      url: "/history",
-      icon: BookOpen,
-    },
+
     {
       title: "Configuración",
       url: "/settings",
