@@ -17,7 +17,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { supabase } from "@/lib/supabase"
 
 export default function UploadPage() {
-  const { user, loading , signOut } = useAuth()
+  const { user, loading } = useAuth()
   const router = useRouter()
   const [files, setFiles] = useState<File[]>([])
   const [uploading, setUploading] = useState(false)

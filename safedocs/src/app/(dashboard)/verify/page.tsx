@@ -59,7 +59,7 @@ interface VerificationResult {
 }
 
 export default function VerifyPage() {
-  const { user, loading, signOut } = useAuth()
+  const { user, loading,  } = useAuth()
   const router = useRouter()
   const [verifying, setVerifying] = useState(false)
   const [verificationProgress, setVerificationProgress] = useState(0)

@@ -30,7 +30,7 @@ import {
 import { Alert, AlertDescription } from "@/components/ui/alert"
 
 export default function SettingsPage() {
-  const { user, loading, signOut } = useAuth()
+  const { user, loading } = useAuth()
   const router = useRouter()
 
   const [profile, setProfile] = useState({
