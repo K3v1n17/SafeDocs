@@ -15,6 +15,7 @@ import { Progress } from "@/components/ui/progress"
 import { Upload, FileText, ImageIcon, File, AlertCircle, X } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { supabase } from "@/lib/supabase"
+import { sha256Hex } from "@/lib/utils/index"
 
 export default function UploadPage() {
   const { user, loading , signOut } = useAuth()
@@ -54,21 +55,6 @@ export default function UploadPage() {
 
   const removeFile = (index: number) => {
     setFiles((prev) => prev.filter((_, i) => i !== index))
-  }
-
-  // Función para calcular SHA256 del archivo (básica)
-  async function calculateChecksum(file: File): Promise<string> {
-    try {
-      const arrayBuffer = await file.arrayBuffer()
-      const hashBuffer = await crypto.subtle.digest('SHA-256', arrayBuffer)
-      const hashArray = Array.from(new Uint8Array(hashBuffer))
-      const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('')
-      return `sha256:${hashHex}`
-    } catch (error) {
-      console.error('Error calculando checksum:', error)
-      // Fallback: generar un hash simple basado en nombre y tamaño
-      return `sha256:${btoa(file.name + file.size + Date.now()).replace(/[^a-zA-Z0-9]/g, '').substring(0, 32)}`
-    }
   }
 
   // Función para crear verificación inicial
@@ -128,9 +114,11 @@ export default function UploadPage() {
       const file = files[i]
       try {
         // Calcular checksum del archivo
-        const checksum = await calculateChecksum(file)
-        
-        const filePath = `public/${user.id}/${Date.now()}_${file.name}`
+        const checksum = await sha256Hex(await file.arrayBuffer())
+        console.log(`Checksum for ${file.name}:`, checksum)
+
+        const safeName = file.name.trim().replace(/\s+/g, "_");
+        const filePath = `public/${user.id}/${Date.now()}_${safeName}`;
 
         // Subir al storage 
         const { data: uploadData, error: uploadError } = await supabase.storage
