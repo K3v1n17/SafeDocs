@@ -55,11 +55,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
  
-  /* 3️⃣  Login Google */
+  
   const signInWithGoogle = async () => {
     setLoading(true);
     
-    // Obtener la URL de producción de forma más confiable
     const productionUrl = typeof window !== 'undefined' 
       ? window.location.href.split('#')[0].split('?')[0]
       : '';
