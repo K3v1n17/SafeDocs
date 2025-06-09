@@ -9,6 +9,7 @@ import { StatsCards } from "../../../components/overview/StatsCards"
 import { StorageUsageCard } from "../../../components/overview/StorageUsageCard"
 import { QuickActionsCard } from "../../../components/overview/QuickActionsCard"
 import { RecentActivityCard } from "../../../components/overview/RecentActivityCard"
+import Loading from "@/components/ui/Loading"
 
 export default function DashboardPage() {
   const { user, loading } = useAuth()
@@ -21,7 +22,7 @@ export default function DashboardPage() {
     }
   }, [user, loading, router])
 
-  if (loading || !user || isLoading) return null
+  if (loading || !user || isLoading) return  <Loading title="Overview" />
 
   return (
     <>
