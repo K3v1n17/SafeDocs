@@ -9,6 +9,7 @@ import {
   Link2,
   ShieldCheck,
   Settings2,
+  MessageSquare as chat,
 } from "lucide-react";
 
 import { NavMain } from "./nav-main"
@@ -66,6 +67,11 @@ const data = {
       title: "Configuración",
       url: "/settings",
       icon: Settings2,
+    },
+    {
+      title: "Chat",
+      url: "/chat",
+      icon: chat,
     },
   ],
 };
