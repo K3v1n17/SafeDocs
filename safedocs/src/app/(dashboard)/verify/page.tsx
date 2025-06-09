@@ -85,7 +85,7 @@ export default function VerifyPage() {
     try {
       setLoadingData(true)
 
-      // Obtener documentos del usuario
+      // Obtener documentos del usuario ESPECIFOC POR EL USER.ID
       const { data: documents, error: docsError } = await supabase
         .from('documents')
         .select('*')
@@ -198,7 +198,7 @@ export default function VerifyPage() {
         setVerificationProgress(Math.floor((processedCount / totalDocuments) * 100))
 
         // Aquí deberías implementar la lógica real de verificación
-        // Por simplicidad, vamos a simular un resultado aleatorio
+        // simulacion de  un resultado aleatorio
         const statusOptions = ['verified', 'modified', 'corrupted', 'unknown']
         const randomStatus = statusOptions[Math.floor(Math.random() * statusOptions.length)]
         const integrity = Math.floor(Math.random() * 101) // Simular integridad entre 0 y 100

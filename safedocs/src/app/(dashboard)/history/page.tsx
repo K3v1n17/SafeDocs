@@ -51,7 +51,7 @@ interface HistoryEntry {
 }
 
 export default function HistoryPage() {
-  const { user, loading, signOut } = useAuth()
+  const { user, loading } = useAuth()
   const router = useRouter()
   const [searchTerm, setSearchTerm] = useState("")
   const [filterAction, setFilterAction] = useState("all")
