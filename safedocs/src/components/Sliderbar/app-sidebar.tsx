@@ -57,12 +57,6 @@ const data = {
       url: "/verify",
       icon: CheckSquare,
     },
-
-    {
-      title: "Configuración",
-      url: "/settings",
-      icon: Settings2,
-    },
   ],
 };
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {

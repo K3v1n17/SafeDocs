@@ -19,15 +19,7 @@ interface ProfileSettingsProps {
 
 export function ProfileSettings({ profile, onProfileChange }: ProfileSettingsProps) {
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <User className="h-5 w-5" />
-          Perfil de Usuario
-        </CardTitle>
-        <CardDescription>Información personal y datos de contacto</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-6">
+    <>
         <div className="flex items-center gap-6">
           <Avatar className="h-20 w-20">
             <AvatarImage src="/avatars/default-avatar.png" />
@@ -84,7 +76,6 @@ export function ProfileSettings({ profile, onProfileChange }: ProfileSettingsPro
             rows={3}
           />
         </div>
-      </CardContent>
-    </Card>
+        </>
   )
 }

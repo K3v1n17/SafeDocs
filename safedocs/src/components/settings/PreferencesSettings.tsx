@@ -15,15 +15,7 @@ interface PreferencesProps {
 
 export function PreferencesSettings({ preferences, onPreferencesChange }: PreferencesProps) {
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Settings className="h-5 w-5" />
-          Preferencias
-        </CardTitle>
-        <CardDescription>Personaliza tu experiencia en Safedocs</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
+<>
         <div className="grid gap-4 md:grid-cols-2">
           <div className="space-y-2">
             <Label>Tema</Label>
@@ -104,7 +96,6 @@ export function PreferencesSettings({ preferences, onPreferencesChange }: Prefer
             </Select>
           </div>
         </div>
-      </CardContent>
-    </Card>
+</>
   )
 }

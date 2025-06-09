@@ -21,15 +21,7 @@ interface SecuritySettingsProps {
 
 export function SecuritySettings({ security, onSecurityChange }: SecuritySettingsProps) {
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Shield className="h-5 w-5" />
-          Seguridad
-        </CardTitle>
-        <CardDescription>Configuración de seguridad y autenticación</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-6">
+    <>
         <div className="flex items-center justify-between">
           <div className="space-y-1">
             <Label>Autenticación de Dos Factores</Label>
@@ -116,12 +108,7 @@ export function SecuritySettings({ security, onSecurityChange }: SecuritySetting
             <Smartphone className="mr-2 h-4 w-4" />
             Configurar Autenticador
           </Button>
-          <Button variant="outline" className="w-full justify-start">
-            <Download className="mr-2 h-4 w-4" />
-            Descargar Códigos de Respaldo
-          </Button>
         </div>
-      </CardContent>
-    </Card>
+</>
   )
 }

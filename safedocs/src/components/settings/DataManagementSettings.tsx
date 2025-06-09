@@ -5,15 +5,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 
 export function DataManagementSettings() {
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Download className="h-5 w-5" />
-          Gestión de Datos
-        </CardTitle>
-        <CardDescription>Exporta o elimina tus datos</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
+<>
         <div className="space-y-3">
           <Button variant="outline" className="w-full justify-start">
             <Download className="mr-2 h-4 w-4" />
@@ -35,7 +27,6 @@ export function DataManagementSettings() {
             Todos los datos exportados están encriptados y requieren tu contraseña para acceder.
           </AlertDescription>
         </Alert>
-      </CardContent>
-    </Card>
+</>
   )
 }
