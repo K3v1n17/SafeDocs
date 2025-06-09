@@ -194,9 +194,6 @@ export default function VerifyPage() {
     return +(equal * 100 / a.length).toFixed(2);
   }
 
-  /* ------------------------------------------------------------------ */
-  /* 2️⃣ FUNCIÓN handleVerification — reemplaza la tuya                 */
-  /* ------------------------------------------------------------------ */
   const handleVerification = async () => {
     if (!user) return;
 
@@ -297,9 +294,6 @@ export default function VerifyPage() {
       setVerificationProgress(0);
     }
   };
-  /* ------------------------------------------------------------------ */
-  /* FIN DEL BLOQUE NUEVO ✨                                             */
-  /* ------------------------------------------------------------------ */
 
   const formatTimeAgo = (date: Date): string => {
     const now = new Date()
