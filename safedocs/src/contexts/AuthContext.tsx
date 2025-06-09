@@ -59,7 +59,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setLoading(true);
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
-      options: { redirectTo: `https://safe-docs-gray.vercel.app/overview` }
+      options: { redirectTo: `${window.location.origin}/overview` }
     });
     if (error) console.error('Error al iniciar con Google:', error.message);
     setLoading(false);
