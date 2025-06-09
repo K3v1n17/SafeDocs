@@ -34,8 +34,10 @@ export const useShareChat = (shareUuid: string) => {
     fetchHistory();
   }, [shareUuid]);
 
-  /* 2 — realtime */
-  useEffect(() => {
+ {/* 2 — realtime       
+  
+  
+   useEffect(() => {
     if (!shareUuid) return;
 
     const channel = supabase
@@ -56,6 +58,48 @@ export const useShareChat = (shareUuid: string) => {
     return () => channel.unsubscribe();
   }, [shareUuid]);
 
+  
+  
+  
+  */ }  
+
+  useEffect(() => {
+    if (!shareUuid) return;
+
+    const channel = supabase
+      .channel(`share:${shareUuid}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'document_share_messages',
+          filter: `share_id=eq.${shareUuid}`,
+        },
+        (payload) => {
+          const newMsg = payload.new as ChatMessage;
+
+          setMessages((prev) => {
+            // Evitar mensajes duplicados por id
+            if (prev.find((msg) => msg.id === newMsg.id)) {
+              return prev;
+            }
+
+            // Insertar y ordenar por created_at
+            const updated = [...prev, newMsg].sort((a, b) =>
+              new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+            );
+            return updated;
+          });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [shareUuid]);
+ 
   /* 3 — enviar */
   const sendMessage = useCallback(
     async (content: string) => {
