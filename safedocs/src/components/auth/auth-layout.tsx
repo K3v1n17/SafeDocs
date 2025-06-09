@@ -1,4 +1,3 @@
-import { Icons } from '../icons';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Globe } from 'lucide-react';
 import Image from 'next/image';

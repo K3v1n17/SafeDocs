@@ -18,10 +18,7 @@ const formSchema = z.object({
   password: z.string().min(1, 'La contraseña es requerida'),
 });
 
-export function LoginForm({
-  className,
-  ...props
-}: React.ComponentProps<"div">) {
+export function LoginForm() {
   const { signInWithGoogle, signInWithEmail } = useAuth();
   const [loginError, setLoginError] = useState<string | null>(null);
 
