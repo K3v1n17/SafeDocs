@@ -133,7 +133,7 @@ export default function UploadPage() {
         const filePath = `public/${user.id}/${Date.now()}_${file.name}`
 
         // Subir al storage 
-        const { data: uploadData, error: uploadError } = await supabase.storage
+        const { error: uploadError } = await supabase.storage
           .from("archivos")
           .upload(filePath, file)
 
@@ -178,8 +178,14 @@ export default function UploadPage() {
         }
 
         setUploadProgress(Math.round(((i + 1) / files.length) * 100))
-      } catch (error: any) {
-        alert(`Error al subir ${file.name}: ${error.message || error}`)
+      } catch (error: unknown) {
+        let errorMessage = "Error desconocido"
+        if (error instanceof Error) {
+          errorMessage = error.message
+        } else if (typeof error === "string") {
+          errorMessage = error
+        }
+        alert(`Error al subir ${file.name}: ${errorMessage}`)
         console.error('Error en upload:', error)
       }
     }

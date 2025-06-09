@@ -24,7 +24,11 @@ import {
 } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 
-interface Document {
+
+{/*
+  
+  
+  interface Document {
   id: string
   title: string
   mime_type: string
@@ -41,9 +45,16 @@ interface DocumentVerification {
   status: "verified" | "modified" | "corrupted" | "unknown"
   integrity_pct: number
   hash_checked: string
-  details: any
+  details: string[]
   created_at: string
 }
+  
+  
+
+  
+  
+  */}
+
 
 interface VerificationResult {
   id: string
@@ -115,7 +126,7 @@ export default function VerifyPage() {
         const latestVerification = docVerifications[0] // Ya están ordenados por fecha descendente
 
         // Generar detalles basados en el estado
-        const generateDetails = (status: string, integrity: number): string[] => {
+        const generateDetails = (status: string): string[] => {
           switch (status) {
             case 'verified':
               return [
@@ -156,8 +167,8 @@ export default function VerifyPage() {
           details: latestVerification?.details 
             ? Array.isArray(latestVerification.details) 
               ? latestVerification.details 
-              : generateDetails(latestVerification.status, latestVerification.integrity_pct)
-            : generateDetails('unknown', 0)
+              : generateDetails(latestVerification.status)
+            : generateDetails('unknown')
         }
       }) || []
 

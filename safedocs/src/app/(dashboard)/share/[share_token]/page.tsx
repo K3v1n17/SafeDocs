@@ -6,9 +6,9 @@ import {
   Send,
   Share2,
   Users,
-  Clock,
-  Copy,
-  Eye,
+ // Clock,
+ // Copy,
+  //Eye,
   MessageCircle,
 } from 'lucide-react';
 
@@ -27,7 +27,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Badge } from '@/components/ui/badge';
+//import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 
 export default function SharePage() {
@@ -88,7 +88,7 @@ export default function SharePage() {
     sendMessage(draft);
     setDraft('');
   };
-  const copyShareLink = (link: string) => navigator.clipboard.writeText(link);
+  //const copyShareLink = (link: string) => navigator.clipboard.writeText(link);
 
   /* Carga inicial / token incorrecto */
   if (loading || !lookupDone) return null;
