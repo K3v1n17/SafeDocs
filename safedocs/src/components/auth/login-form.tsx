@@ -37,7 +37,7 @@ export function LoginForm({
   const isLoading = form.formState.isSubmitting;
 
   const onSubmit = async (data: z.infer<typeof formSchema>) => {
-    setLoginError(null); // Clear previous errors
+    setLoginError(null); 
     
     try {
       await signInWithEmail(data.email, data.password);
