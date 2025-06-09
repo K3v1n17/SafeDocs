@@ -54,33 +54,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => subscription.unsubscribe();
   }, []);
 
- 
-  
+  /* 3️⃣  Login Google */
   const signInWithGoogle = async () => {
     setLoading(true);
-    
-    const productionUrl = typeof window !== 'undefined' 
-      ? window.location.href.split('#')[0].split('?')[0]
-      : '';
-    
-    const redirectUrl = productionUrl.includes('localhost') 
-      ? `${window.location.origin}/overview`
-      : `${productionUrl.replace(/\/$/, '')}/overview`;
-    
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
-      options: { 
-        redirectTo: redirectUrl,
-        // Asegurar que se limpie cualquier parámetro previo
-        queryParams: {
-          prompt: 'select_account'
-        }
-      }
+      options: { redirectTo: `https://safe-docs-gray.vercel.app/overview` }
     });
-    
     if (error) console.error('Error al iniciar con Google:', error.message);
     setLoading(false);
   };
+  
   /* 4️⃣  Login con Email y Contraseña */
   const signInWithEmail = async (email: string, password: string) => {
     try {
