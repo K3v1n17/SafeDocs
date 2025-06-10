@@ -10,7 +10,24 @@ const compat = new FlatCompat({
 });
 
 const eslintConfig = [
-  ...compat.extends("next/core-web-vitals", "next/typescript"),
+  ...compat.extends("next/core-web-vitals", "next/typescript", "plugin:@tanstack/query/recommended"),
+  {
+    plugins: ["unused-imports", "@typescript-eslint"],
+    rules: {
+      "@typescript-eslint/no-explicit-any": "off",
+      "@typescript-eslint/no-unused-vars": "off",
+      "@typescript-eslint/ban-ts-comment": "off",
+      "unused-imports/no-unused-imports": "error",
+      "@typescript-eslint/consistent-type-imports": [
+        "error",
+        {
+          "prefer": "type-imports",
+          "disallowTypeAnnotations": true,
+          "fixStyle": "separate-type-imports"
+        }
+      ]
+    }
+  }
 ];
 
 export default eslintConfig;

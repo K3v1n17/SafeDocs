@@ -10,6 +10,7 @@ import {
   ShieldCheck,
   Settings2,
 } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext"
 
 import { NavMain } from "./nav-main"
 import { NavUser } from "./nav-user"
@@ -22,64 +23,63 @@ import {
   SidebarRail,
 } from "@/components/ui/sidebar"
 
-const data = {
-  user: {
-    name: "Usuario Safedocs",
-    email: "usuario@safedocs.com",
-    avatar: "/avatars/default-avatar.png",
+const teams = [
+  {
+    name: "Safedocs Inc",
+    logo: ShieldCheck,
+    plan: "Enterprise",
   },
-  teams: [
-    {
-      name: "Safedocs Inc",
-      logo: ShieldCheck,
-      plan: "Enterprise",
-    },
-  ],
-  navMain: [
-    {
-      title: "Dashboard",
-      url: "/overview",
-      icon: AudioWaveform,
-      isActive: true,
-    },
-    {
-      title: "Subir Documentos",
-      url: "/upload",
-      icon: CloudUpload,
-    },
-    {
-      title: "Compartir Documentos",
-      url: "/share",
-      icon: Link2,
-    },
-    {
-      title: "Verificar Documentos",
-      url: "/verify",
-      icon: CheckSquare,
-    },
-    {
-      title: "Historial",
-      url: "/history",
-      icon: BookOpen,
-    },
-    {
-      title: "Configuración",
-      url: "/settings",
-      icon: Settings2,
-    },
-  ],
-};
+];
+
+const navMain = [
+  {
+    title: "Dashboard",
+    url: "/overview",
+    icon: AudioWaveform,
+    isActive: true,
+  },
+  {
+    title: "Mi Almacen",
+    url: "/history",
+    icon: BookOpen,
+  },
+  {
+    title: "Compartir Documentos",
+    url: "/share",
+    icon: Link2,
+  },
+  {
+    title: "Verificar Documentos",
+    url: "/verify",
+    icon: CheckSquare,
+  },
+];
+
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+  const { user } = useAuth();
+
+  // Get user display name from metadata or email
+  const userName = user?.user_metadata?.full_name || 
+                   user?.email?.split('@')[0] || 
+                   "Usuario Safedocs";
+  
+  // Create user data object with actual user information
+  const userData = {
+    name: userName,
+    email: user?.email || "usuario@safedocs.com",
+    avatar: user?.user_metadata?.avatar_url || "/avatars/default-avatar.png",
+  };
+
   return (
     <Sidebar collapsible="icon" {...props}>
       <SidebarHeader>
-        <TeamSwitcher teams={data.teams} />
+        <TeamSwitcher teams={teams} />
       </SidebarHeader>
       <SidebarContent>
-        <NavMain items={data.navMain} />
+        <NavMain items={navMain} />
       </SidebarContent>
       <SidebarFooter>
-        <NavUser user={data.user} />
+        <NavUser user={userData} />
       </SidebarFooter>
       <SidebarRail />
     </Sidebar>

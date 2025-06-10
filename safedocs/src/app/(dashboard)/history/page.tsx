@@ -27,6 +27,8 @@ import {
   X,
 } from "lucide-react" 
 import { supabase } from "@/lib/supabase"
+import Loading from "@/components/ui/Loading"
+import { UploadDocumentDialog } from "@/modals/UploadDocumentDialog"
 
 interface Document {
   id: string
@@ -51,7 +53,7 @@ interface HistoryEntry {
 }
 
 export default function HistoryPage() {
-  const { user, loading, signOut } = useAuth()
+  const { user, loading } = useAuth()
   const router = useRouter()
   const [searchTerm, setSearchTerm] = useState("")
   const [filterAction, setFilterAction] = useState("all")
@@ -177,16 +179,8 @@ export default function HistoryPage() {
     setEditTitle("")
   }
 
-  if (loading || loadingData) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
-          <p className="mt-2 text-muted-foreground">Cargando...</p>
-        </div>
-      </div>
-    )
-  }
+
+  if (loading || loadingData) return <Loading title="Verificar Documentos"/>
 
   if (!user) {
     return null
@@ -280,6 +274,12 @@ export default function HistoryPage() {
       <DashboardTitle>Historial</DashboardTitle>
 
       <div className="flex-1 space-y-6 p-6">
+        {/* Header with upload button */}
+        <div className="flex justify-between items-center">
+          <h2 className="text-2xl font-bold tracking-tight">Mis Documentos y Actividades</h2>
+          <UploadDocumentDialog />
+        </div>
+
         {/* Stats Cards */}
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           <Card>

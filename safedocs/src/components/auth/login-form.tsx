@@ -1,46 +1,148 @@
 'use client';
 
-import { cn } from "lib/utils";
-import { Button } from "@/components/ui/button";
-import { useAuth } from "@/contexts/AuthContext";
+import { zodResolver } from '@hookform/resolvers/zod';
+import { useForm } from 'react-hook-form';
+import { toast } from 'sonner';
+import { z } from 'zod';
+import { useState } from 'react';
 
-export function LoginForm({
-  className,
-  ...props
-}: React.ComponentProps<"form">) {
-  const { signInWithGoogle } = useAuth();
+import { Button } from "@/components/ui/button";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { useAuth } from "@/contexts/AuthContext";
+import { Icons } from "@/components/ui/icons";
+import Link from "next/link";
+
+const formSchema = z.object({
+  email: z.string().email('Ingresa un correo electrónico válido'),
+  password: z.string().min(1, 'La contraseña es requerida'),
+});
+
+export function LoginForm() {
+  const { signInWithGoogle, signInWithEmail } = useAuth();
+  const [loginError, setLoginError] = useState<string | null>(null);
+
+  const form = useForm<z.infer<typeof formSchema>>({
+    resolver: zodResolver(formSchema),
+    defaultValues: {
+      email: '',
+      password: '',
+    },
+    mode: 'onBlur',
+  });
+  
+  const isLoading = form.formState.isSubmitting;
+
+  const onSubmit = async (data: z.infer<typeof formSchema>) => {
+    setLoginError(null); 
+    
+    try {
+      await signInWithEmail(data.email, data.password);
+      toast.success('Inicio de sesión exitoso');
+    } catch (error: any) {
+      if (error.message.includes('Invalid login credentials')) {
+        setLoginError('Credenciales inválidas. Por favor verifica tu correo y contraseña.');
+        toast.error('Error al iniciar sesión: "Invalid login credentials"');
+      } else if (error.message.includes('Email not confirmed')) {
+        setLoginError('Correo electrónico no confirmado. Por favor verifica tu bandeja de entrada.');
+        toast.error('Error al iniciar sesión: "Email not confirmed"');
+      } else {
+        setLoginError(`Error: ${error.message || "Desconocido"}`);
+        toast.error(`Error al iniciar sesión: "${error.message || "Desconocido"}"`);
+      }
+    }
+  };
 
   return (
-    <form
-      className={cn("flex flex-col gap-6", className)}
-      onSubmit={(e) => {
-        e.preventDefault();
-        signInWithGoogle();
-      }}
-      {...props}
-    >
+    <div className="flex flex-col gap-6">
       <div className="flex flex-col items-center gap-2 text-center">
-        <h1 className="text-2xl font-bold">Login to your account</h1>
+        <h1 className="text-2xl font-bold">Inicia sesión en tu cuenta</h1>
         <p className="text-muted-foreground text-sm text-balance">
-          Enter your email below to login to your account
+          Ingresa tus credenciales para acceder a tu cuenta
         </p>
       </div>
-      <div className="grid gap-6">
-        {/* Aquí eliminamos los inputs de email/password y el botón de GitHub */}
-        <div className="after:border-border relative text-center text-sm after:absolute after:inset-0 after:top-1/2 after:z-0 after:flex after:items-center after:border-t">
+
+      <Form {...form}>
+        <form onSubmit={form.handleSubmit(onSubmit)} className="flex w-full max-w-[350px] flex-col gap-y-4 mx-auto">
+          <FormField
+            control={form.control}
+            name="email"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Correo electrónico</FormLabel>
+                <FormControl>
+                  <Input placeholder="correo@ejemplo.com" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="password"
+            render={({ field }) => (
+              <FormItem>
+                <div className="flex items-center justify-between">
+                  <FormLabel>Contraseña</FormLabel>
+                  <Link href="/forgot-password" className="text-sm text-blue-600 hover:underline">
+                    ¿Olvidaste tu contraseña?
+                  </Link>
+                </div>
+                <FormControl>
+                  <Input type="password" placeholder="********" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          {loginError && (
+            <div className="text-sm font-medium text-destructive mt-1">
+              {loginError}
+            </div>
+          )}
+
+          <Button type="submit" className="w-full" disabled={isLoading}>
+            {isLoading ? (
+              <Icons.spinner className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              "Iniciar sesión"
+            )}
+          </Button>
+          
+          <div className="text-center">
+            <p className="text-sm text-muted-foreground">
+              ¿No tienes cuenta?{" "}
+              <Link href="/register" className="text-blue-600 hover:underline">
+                Regístrate aquí
+              </Link>
+            </p>
+          </div>
+        </form>
+      </Form>
+
+      <div className="relative w-full max-w-[350px] mx-auto">
+        <div className="absolute inset-0 flex items-center">
+          <span className="w-full border-t" />
+        </div>
+        <div className="relative flex justify-center text-xs uppercase">
           <span className="bg-background text-muted-foreground relative z-10 px-2">
-            Or continue with
+            O continúa con
           </span>
         </div>
-        <Button
-          variant="outline"
-          className="w-full"
-          onClick={signInWithGoogle}
-        >
+      </div>
+      
+      <Button
+        variant="outline"
+        className="w-full max-w-[350px] mx-auto"
+        type="button"
+        onClick={signInWithGoogle}
+      >
         <svg
           xmlns="http://www.w3.org/2000/svg"
           viewBox="0 0 48 48"
-          className="w-5 h-5"
+          className="mr-2 w-5 h-5"
         >
           <path
             fill="#EA4335"
@@ -60,9 +162,8 @@ export function LoginForm({
           />
           <path fill="none" d="M0 0h48v48H0z" />
         </svg>
-          Login with Google
-        </Button>
-      </div>
-    </form>
+        Continuar con Google
+      </Button>
+    </div>
   );
 }
