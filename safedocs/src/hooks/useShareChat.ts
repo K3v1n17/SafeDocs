@@ -15,7 +15,7 @@ export interface ChatMessage {
   sender_name?: string;
 }
 
-export const useShareChat = (shareUuid: string) => {
+export const useShareChat = (shareUuid: string, currentUserId?: string) => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(true);  /* 1 — histórico */
   useEffect(() => {
@@ -105,14 +105,14 @@ export const useShareChat = (shareUuid: string) => {
       supabase.removeChannel(channel);
     };
   }, [shareUuid]);
-   /* 3 — enviar */
-  const sendMessage = useCallback(
+   /* 3 — enviar */  const sendMessage = useCallback(
     async (content: string) => {
       if (!content.trim()) return;
       
-      // Insertar el mensaje
+      // Insertar el mensaje con sender_id
       const { error } = await supabase.from('document_share_messages').insert({
         share_id: shareUuid,
+        sender_id: currentUserId,
         content,
         msg_type: 'text',
       });
@@ -121,7 +121,7 @@ export const useShareChat = (shareUuid: string) => {
         console.error('Error enviando mensaje:', error);
       }
     },
-    [shareUuid]
+    [shareUuid, currentUserId]
   );
 
   return { messages, loading, sendMessage };

@@ -73,7 +73,7 @@ export default function SharePage() {
     messages,
     loading: loadingChat,
     sendMessage,
-  } = useShareChat(shareUuid ?? '');
+  } = useShareChat(shareUuid ?? '', user?.id);
 
   /* Hook para usuarios conectados */
   const { users: connectedUsers, loading: loadingUsers } = useConnectedUsers(shareUuid ?? '');
