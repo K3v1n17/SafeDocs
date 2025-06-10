@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 
 export interface ChatMessage {
@@ -17,7 +17,16 @@ export interface ChatMessage {
 
 export const useShareChat = (shareUuid: string, currentUserId?: string) => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [loading, setLoading] = useState(true);  /* 1 — histórico */
+  const [loading, setLoading] = useState(true);
+  const [forceUpdate, setForceUpdate] = useState(0);
+  const messagesRef = useRef<ChatMessage[]>([]);
+
+  // Función para forzar re-render
+  const triggerUpdate = useCallback(() => {
+    setForceUpdate((prev) => prev + 1);
+  }, []);
+
+  /* 1 — histórico */
   useEffect(() => {
     if (!shareUuid) return;
 
@@ -29,8 +38,10 @@ export const useShareChat = (shareUuid: string, currentUserId?: string) => {
         .order('created_at', { ascending: true });
 
       if (!error && data) {
-        // Por ahora usar datos básicos, más tarde podemos mejorar con info de usuario
-        setMessages(data as ChatMessage[]);
+        const chatMessages = data as ChatMessage[];
+        messagesRef.current = chatMessages;
+        setMessages(chatMessages);
+        triggerUpdate();
       } else {
         console.error('Error fetching chat history:', error);
       }
@@ -38,42 +49,14 @@ export const useShareChat = (shareUuid: string, currentUserId?: string) => {
     };
 
     fetchHistory();
-  }, [shareUuid]);
+  }, [shareUuid, triggerUpdate]);
 
- {/* 2 — realtime       
-  
-  
-   useEffect(() => {
-    if (!shareUuid) return;
-
-    const channel = supabase
-      .channel(`share:${shareUuid}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'document_share_messages',
-          filter: `share_id=eq.${shareUuid}`,
-        },
-        (payload) =>
-          setMessages((prev) => [...prev, payload.new as ChatMessage])
-      )
-      .subscribe();
-
-    return () => channel.unsubscribe();
-  }, [shareUuid]);
-
-  
-  
-  
-  */ }  
-
+  /* 2 — realtime */
   useEffect(() => {
     if (!shareUuid) return;
 
     const channel = supabase
-      .channel(`share:${shareUuid}`)
+      .channel(`share-chat-${shareUuid}`)
       .on(
         'postgres_changes',
         {
@@ -85,18 +68,18 @@ export const useShareChat = (shareUuid: string, currentUserId?: string) => {
         (payload) => {
           const newMsg = payload.new as ChatMessage;
 
-          setMessages((prev) => {
-            // Evitar mensajes duplicados por id
-            if (prev.find((msg) => msg.id === newMsg.id)) {
-              return prev;
-            }
+          // Actualizar la referencia
+          const currentMessages = messagesRef.current;
+          const messageExists = currentMessages.some((msg) => msg.id === newMsg.id);
 
-            // Insertar y ordenar por created_at
-            const updated = [...prev, newMsg].sort((a, b) =>
-              new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-            );
-            return updated;
-          });
+          if (!messageExists) {
+            const updatedMessages = [...currentMessages, newMsg];
+            messagesRef.current = updatedMessages;
+
+            // Forzar actualización del estado
+            setMessages([...updatedMessages]);
+            triggerUpdate();
+          }
         }
       )
       .subscribe();
@@ -104,25 +87,32 @@ export const useShareChat = (shareUuid: string, currentUserId?: string) => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [shareUuid]);
-   /* 3 — enviar */  const sendMessage = useCallback(
+  }, [shareUuid, triggerUpdate]);
+
+  /* 3 — enviar */
+  const sendMessage = useCallback(
     async (content: string) => {
-      if (!content.trim()) return;
-      
-      // Insertar el mensaje con sender_id
-      const { error } = await supabase.from('document_share_messages').insert({
-        share_id: shareUuid,
-        sender_id: currentUserId,
-        content,
-        msg_type: 'text',
-      });
-      
-      if (error) {
+      if (!content.trim() || !shareUuid || !currentUserId) return;
+
+      try {
+        const { error } = await supabase
+          .from('document_share_messages')
+          .insert({
+            share_id: shareUuid,
+            sender_id: currentUserId,
+            content: content.trim(),
+            msg_type: 'text',
+          });
+
+        if (error) {
+          console.error('Error enviando mensaje:', error);
+        }
+      } catch (error) {
         console.error('Error enviando mensaje:', error);
       }
     },
     [shareUuid, currentUserId]
   );
 
-  return { messages, loading, sendMessage };
+  return { messages, loading, sendMessage, forceUpdate };
 };

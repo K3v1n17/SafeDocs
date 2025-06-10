@@ -73,6 +73,7 @@ export default function SharePage() {
     messages,
     loading: loadingChat,
     sendMessage,
+    forceUpdate,
   } = useShareChat(shareUuid ?? '', user?.id);
 
   /* Hook para usuarios conectados */
@@ -81,15 +82,35 @@ export default function SharePage() {
   /** UI State */
   const [draft, setDraft] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  
+  // Scroll automático cuando lleguen nuevos mensajes
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [messages, forceUpdate]);
+
+  // Forzar re-render cuando cambien los mensajes
+  useEffect(() => {
+    // Este efecto se ejecuta cada vez que cambian los mensajes
+    // Ayuda a asegurar que la UI se actualice
+    console.log('Messages updated:', messages.length);
+  }, [messages.length, forceUpdate]);
+
   /** Helpers */
   const handleSend = () => {
+    if (!draft.trim()) return;
     sendMessage(draft);
     setDraft('');
   };
-  
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSend();
+    }
+  };
+
   const copyShareLink = () => {
     const link = `${share_token}`;
     navigator.clipboard.writeText(link).then(() => {
@@ -155,13 +176,13 @@ export default function SharePage() {
 
             <CardContent className="flex-1 flex flex-col p-4 min-h-0">
               {/* Mensajes */}
-              <div className="flex-1 overflow-y-auto space-y-3 mb-4 pr-2 min-h-0">
+              <div className="flex-1 overflow-y-auto space-y-3 mb-4 pr-2 min-h-0" key={`messages-${forceUpdate}`}>
                 {loadingChat && (
                   <p className="text-sm text-muted-foreground">Cargando…</p>
                 )}
-                {messages.map((msg) => (
+                {messages.map((msg, index) => (
                   <div
-                    key={msg.id}
+                    key={`${msg.id}-${index}-${forceUpdate}`}
                     className={`flex ${
                       msg.sender_id === user?.id
                         ? 'justify-end'
@@ -208,7 +229,7 @@ export default function SharePage() {
                 <Input
                   value={draft}
                   onChange={(e) => setDraft(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && handleSend()}
+                  onKeyDown={handleKeyDown}
                   placeholder="Escribe un mensaje…"
                   className="flex-1 min-w-0"
                 />

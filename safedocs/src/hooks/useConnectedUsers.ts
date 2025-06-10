@@ -13,62 +13,85 @@ export const useConnectedUsers = (shareUuid: string) => {
   const [users, setUsers] = useState<ConnectedUser[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
+  // Función para obtener usuarios
+  const fetchUsers = async () => {
     if (!shareUuid) {
+      setUsers([]);
       setLoading(false);
       return;
     }
 
-    const fetchUsers = async () => {
-      try {
-        // Simplificar: obtener solo los últimos usuarios que han enviado mensajes
-        const { data: messages, error } = await supabase
-          .from('document_share_messages')
-          .select('sender_id, created_at')
-          .eq('share_id', shareUuid)
-          .not('sender_id', 'is', null)
-          .gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
-          .order('created_at', { ascending: false });
+    try {
+      // Obtener los últimos usuarios que han enviado mensajes
+      const { data: messages, error } = await supabase
+        .from('document_share_messages')
+        .select('sender_id, created_at')
+        .eq('share_id', shareUuid)
+        .not('sender_id', 'is', null)
+        .gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
+        .order('created_at', { ascending: false });
 
-        if (error) {
-          console.error('Error fetching messages:', error);
-          setUsers([]);
-          setLoading(false);
-          return;
-        }
-
-        if (!messages || messages.length === 0) {
-          setUsers([]);
-          setLoading(false);
-          return;
-        }
-
-        // Crear usuarios únicos con datos básicos
-        const uniqueUserIds = [...new Set(messages.map(msg => msg.sender_id))];
-        const basicUsers: ConnectedUser[] = uniqueUserIds.map(userId => {
-          const lastMessage = messages.find(msg => msg.sender_id === userId);
-          return {
-            id: userId,
-            email: `usuario-${userId.substring(0, 8)}`,
-            name: `Usuario ${userId.substring(0, 8)}`,
-            last_seen: lastMessage?.created_at
-          };
-        });
-
-        setUsers(basicUsers);
-      } catch (error) {
-        console.error('Error in fetchUsers:', error);
+      if (error) {
+        console.error('Error fetching messages:', error);
         setUsers([]);
-      } finally {
-        setLoading(false);
+        return;
       }
-    };
 
+      if (!messages || messages.length === 0) {
+        setUsers([]);
+        return;
+      }
+
+      // Crear usuarios únicos con datos básicos
+      const uniqueUserIds = [...new Set(messages.map(msg => msg.sender_id))];
+      const basicUsers: ConnectedUser[] = uniqueUserIds.map(userId => {
+        const lastMessage = messages.find(msg => msg.sender_id === userId);
+        return {
+          id: userId,
+          email: `usuario-${userId.substring(0, 8)}`,
+          name: `Usuario ${userId.substring(0, 8)}`,
+          last_seen: lastMessage?.created_at
+        };
+      });
+
+      setUsers(basicUsers);
+    } catch (error) {
+      console.error('Error in fetchUsers:', error);
+      setUsers([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Efecto inicial para cargar usuarios
+  useEffect(() => {
     fetchUsers();
+  }, [shareUuid]);
 
-    // Refrescar cada 30 segundos
-    const interval = setInterval(fetchUsers, 30000);
-    return () => clearInterval(interval);
+  // Suscripción en tiempo real para actualizar usuarios cuando lleguen nuevos mensajes
+  useEffect(() => {
+    if (!shareUuid) return;
+
+    const channel = supabase
+      .channel(`connected-users-${shareUuid}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'document_share_messages',
+          filter: `share_id=eq.${shareUuid}`,
+        },
+        () => {
+          // Actualizar la lista de usuarios cuando llegue un nuevo mensaje
+          fetchUsers();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [shareUuid]);
 
   return { users, loading };
