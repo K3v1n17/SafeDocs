@@ -8,12 +8,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 type Message = {
   sender: "me" | "other"
   text: string
+  timestamp: number
 }
 
 export default function ChatPage() {
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState("")
   const socketRef = useRef<WebSocket | null>(null)
+  const sentMessagesRef = useRef<Set<string>>(new Set())
 
   useEffect(() => {
     const socket = new WebSocket("ws://localhost:3001")
@@ -24,16 +26,23 @@ export default function ChatPage() {
     }
 
     socket.onmessage = (event) => {
-      setMessages((prev) => {
-        if (prev.length > 0) {
-          const lastMsg = prev[prev.length - 1]
-          // Evitar mostrar eco del mensaje enviado
-          if (lastMsg.sender === "me" && lastMsg.text === event.data) {
-            return prev
-          }
-        }
-        return [...prev, { sender: "other", text: event.data }]
+      const messageKey = `${event.data}_${Date.now()}`
+      
+      // Solo verificar eco si el mensaje se envió muy recientemente (últimos 1000ms)
+      const recentSentMessages = Array.from(sentMessagesRef.current).filter(key => {
+        const timestamp = parseInt(key.split('_').pop() || '0')
+        return Date.now() - timestamp < 1000
       })
+      
+      const isEcho = recentSentMessages.some(key => key.startsWith(event.data + '_'))
+      
+      if (!isEcho) {
+        setMessages((prev) => [...prev, { 
+          sender: "other", 
+          text: event.data,
+          timestamp: Date.now()
+        }])
+      }
     }
 
     socket.onclose = () => {
@@ -51,8 +60,22 @@ export default function ChatPage() {
 
   const sendMessage = () => {
     if (socketRef.current && input.trim()) {
+      const messageKey = `${input}_${Date.now()}`
+      
+      // Registrar el mensaje enviado con timestamp
+      sentMessagesRef.current.add(messageKey)
+      
+      // Limpiar mensajes antiguos del registro (más de 5 segundos)
+      setTimeout(() => {
+        sentMessagesRef.current.delete(messageKey)
+      }, 5000)
+      
       socketRef.current.send(input)
-      setMessages((prev) => [...prev, { sender: "me", text: input }])
+      setMessages((prev) => [...prev, { 
+        sender: "me", 
+        text: input,
+        timestamp: Date.now()
+      }])
       setInput("")
     }
   }
@@ -61,7 +84,7 @@ export default function ChatPage() {
     <div className="p-6 max-w-2xl mx-auto">
       <Card>
         <CardHeader>
-          <CardTitle>Chat en Tiempo Real</CardTitle>
+          <CardTitle>Anuncios en Tiempo Real</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="space-y-2 max-h-64 overflow-y-auto border rounded p-2 bg-muted/10">
