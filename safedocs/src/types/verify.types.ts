@@ -9,6 +9,7 @@ export interface VerificationResult {
   integrity: number
   details: string[]
   document_id: string
+  file_path: string
 }
 
 export type VerificationStatus = "verified" | "modified" | "corrupted" | "unknown";

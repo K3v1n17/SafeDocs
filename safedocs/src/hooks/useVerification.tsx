@@ -49,6 +49,7 @@ export function useVerification(user: User | null) {
           id: doc.id,
           document_id: doc.id,
           fileName: doc.title,
+          file_path: doc.file_path,
           status: latestVerification?.status || 'unknown',
           uploadDate: new Date(doc.created_at),
           lastModified: new Date(doc.updated_at),
@@ -80,46 +81,127 @@ export function useVerification(user: User | null) {
     }
   }
 
-  const handleVerification = async () => {
-    if (!user) return
+  /**
+   * Calcula el % de coincidencia entre dos hashes hex (0-100).
+   * 100  → idéntico (archivo íntegro)
+   * <95 → lo marcamos como “modified”
+   * <80 → “corrupted”
+   */
+  function hexSimilarity(a: string, b: string): number {
+    if (a.length !== b.length) return 0;
+    let equal = 0;
+    for (let i = 0; i < a.length; i++) if (a[i] === b[i]) equal++;
+    return +(equal * 100 / a.length).toFixed(2);
+  }
 
-    setVerifying(true)
-    setVerificationProgress(0)
+  // lib/crypto.ts
+  async function sha256Hex(buffer: ArrayBuffer): Promise<string> {
+    const hash = await crypto.subtle.digest('SHA-256', buffer)
+    return [...new Uint8Array(hash)]
+      .map(b => b.toString(16).padStart(2, '0'))
+      .join('')
+  }
+
+  const handleVerification = async () => {
+    if (!user) return;
+
+    setVerifying(true);
+    setVerificationProgress(0);
 
     try {
-      // Simular proceso de verificación
-      const totalDocuments = results.length
-      let processedCount = 0
+      const total = results.length;
+      let finished = 0;
 
-      for (const result of results) {
-        // Simular verificación de cada documento
-        await new Promise(resolve => setTimeout(resolve, 1000))
+      for (const doc of results) {
 
-        // Actualizar progreso
-        processedCount++
-        setVerificationProgress(Math.floor((processedCount / totalDocuments) * 100))
+        // ✅ Validar file_path antes de continuar
+        if (!doc.file_path || typeof doc.file_path !== 'string') {
+        console.warn(`file_path inválido para el documento ${doc.id}`);
+        continue;
+        }
 
-        // Simulación de resultado aleatorio
-        const statusOptions: VerificationStatus[] = ['verified', 'modified', 'corrupted', 'unknown']
-        const randomStatus = statusOptions[Math.floor(Math.random() * statusOptions.length)]
-        const integrity = Math.floor(Math.random() * 101)
 
-        // Actualizar el resultado
-        setResults(prevResults => prevResults.map(r => 
-          r.id === result.id ? { ...r, status: randomStatus, integrity } : r
-        ))
+        /* ── 1. Descargar archivo desde Supabase Storage ─────────────── */
+        // file_path fue guardado como "<bucket>/<carpeta>/archivo.ext"
+        const bucket = "archivos"; // puedes hacer esto fijo si no guardas bucket en la base
+        const fileKey = doc.file_path;
+
+        const { data: file, error: dlError } = await supabase
+          .storage
+          .from(bucket)
+          .download(fileKey)
+
+        /* ── 2. Si no se puede descargar, se marca “corrupted” ───────── */
+        if (dlError || !file) {
+          await supabase.from('document_verifications').insert({
+            document_id: doc.document_id,
+            run_by: user.id,
+            status: 'corrupted',
+            integrity_pct: 0,
+            hash_checked: '',
+            details: { error: 'no-download' }
+          });
+          setResults(prev => prev.map(r =>
+            r.id === doc.id
+              ? { ...r, status: 'corrupted', integrity: 0, details: ['Error al descargar'] }
+              : r
+          ));
+          continue; // pasa al siguiente documento
+        }
+
+        /* ── 3. Calcular SHA-256 del archivo descargado ──────────────── */
+        const fileBuffer = await file.arrayBuffer();
+        const newHash   = await sha256Hex(fileBuffer);
+        console.log(`Nuevo hash para ${doc.fileName}: ${newHash}`);
+
+        /* ── 4. Comparar con el hash almacenado ─────────────────────── */
+        const integrity = hexSimilarity(newHash, doc.hash);   // 0-100
+        let status: 'verified' | 'modified' | 'corrupted';
+
+        if (integrity === 100)      status = 'verified';
+        else if (integrity >= 80)   status = 'modified';
+        else                        status = 'corrupted';
+
+        /* ── 5. Guardar registro de verificación ────────────────────── */
+        await supabase.from('document_verifications').insert({
+          document_id   : doc.document_id,
+          run_by        : user.id,
+          status,
+          integrity_pct : integrity,
+          hash_checked  : newHash,
+          details       : { similarity: integrity }
+        });
+
+        /* ── 6. Actualizar estado en pantalla ───────────────────────── */
+        setResults(prev => prev.map(r =>
+          r.id === doc.id
+            ? {
+                ...r,
+                status,
+                integrity,
+                details : [
+                  status === 'verified'
+                    ? 'Hash coincide con el original'
+                    : `Coincidencia de hash: ${integrity}%`,
+                  `SHA256: ${newHash.slice(0, 20)}…`
+                ]
+              }
+            : r
+        ));
+
+        /* ── 7. Progreso visual ─────────────────────────────────────── */
+        finished++;
+        setVerificationProgress(Math.floor((finished / total) * 100));
       }
 
-      // Actualizar fecha de última verificación
-      setLastVerification(new Date())
-
-    } catch (error) {
-      console.error('Error during verification:', error)
+      setLastVerification(new Date());
+    } catch (err) {
+      console.error('Verification error', err);
     } finally {
-      setVerifying(false)
-      setVerificationProgress(0)
+      setVerifying(false);
+      setVerificationProgress(0);
     }
-  }
+  };
 
   // Función auxiliar para generar detalles basados en el estado
   const generateDetails = (status: string): string[] => {
