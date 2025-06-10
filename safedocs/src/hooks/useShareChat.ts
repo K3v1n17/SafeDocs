@@ -10,13 +10,14 @@ export interface ChatMessage {
   content: string;
   msg_type: 'text' | 'document' | 'system';
   created_at: string;
+  // Campos adicionales para mostrar información del usuario
+  sender_email?: string;
+  sender_name?: string;
 }
 
 export const useShareChat = (shareUuid: string) => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  /* 1 — histórico */
+  const [loading, setLoading] = useState(true);  /* 1 — histórico */
   useEffect(() => {
     if (!shareUuid) return;
 
@@ -27,7 +28,12 @@ export const useShareChat = (shareUuid: string) => {
         .eq('share_id', shareUuid)
         .order('created_at', { ascending: true });
 
-      if (!error && data) setMessages(data as ChatMessage[]);
+      if (!error && data) {
+        // Por ahora usar datos básicos, más tarde podemos mejorar con info de usuario
+        setMessages(data as ChatMessage[]);
+      } else {
+        console.error('Error fetching chat history:', error);
+      }
       setLoading(false);
     };
 
@@ -99,16 +105,21 @@ export const useShareChat = (shareUuid: string) => {
       supabase.removeChannel(channel);
     };
   }, [shareUuid]);
- 
-  /* 3 — enviar */
+   /* 3 — enviar */
   const sendMessage = useCallback(
     async (content: string) => {
       if (!content.trim()) return;
-      await supabase.from('document_share_messages').insert({
+      
+      // Insertar el mensaje
+      const { error } = await supabase.from('document_share_messages').insert({
         share_id: shareUuid,
         content,
         msg_type: 'text',
       });
+      
+      if (error) {
+        console.error('Error enviando mensaje:', error);
+      }
     },
     [shareUuid]
   );
