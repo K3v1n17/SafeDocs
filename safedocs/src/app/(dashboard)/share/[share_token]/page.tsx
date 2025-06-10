@@ -91,7 +91,7 @@ export default function SharePage() {
   };
   
   const copyShareLink = () => {
-    const link = `${window.location.origin}/share/${share_token}`;
+    const link = `${share_token}`;
     navigator.clipboard.writeText(link).then(() => {
       // Podrías agregar una notificación aquí
       console.log('Enlace copiado al portapapeles');
@@ -123,22 +123,23 @@ export default function SharePage() {
     <>
       <DashboardTitle>Chat Grupal</DashboardTitle>
 
-      <div className="flex-1 grid grid-cols-1 lg:grid-cols-3 gap-6 p-6">
-        {/* CHAT */}
+      <div className="flex-1 grid grid-cols-1 lg:grid-cols-3 gap-4 p-4 lg:p-6 min-h-0 overflow-hidden">        {/* CHAT */}
         <div className="lg:col-span-2 space-y-4">
           <Card className="h-[600px] flex flex-col">
-            <CardHeader className="pb-3">
+            <CardHeader className="pb-3 flex-shrink-0">
               <div className="flex items-center justify-between">
-                <div>
+                <div className="min-w-0 flex-1">
                   <CardTitle className="flex items-center gap-2">
-                    <MessageCircle className="h-5 w-5" />
-                    Chat Seguro
-                  </CardTitle>                  <CardDescription>
+                    <MessageCircle className="h-5 w-5 flex-shrink-0" />
+                    <span className="truncate">Chat Seguro</span>
+                  </CardTitle>
+                  <CardDescription className="truncate">
                     {connectedUsers.length} usuarios activos en las últimas 24h
                   </CardDescription>
-                </div>                <div className="flex items-center gap-2">
+                </div>
+                <div className="flex items-center gap-2 flex-shrink-0">
                   <div className="w-2 h-2 bg-green-500 rounded-full" />
-                  <span className="text-sm text-green-600">En línea</span>
+                  <span className="text-sm text-green-600 hidden sm:inline">En línea</span>
                   <Button
                     variant="outline"
                     size="sm"
@@ -146,18 +147,19 @@ export default function SharePage() {
                     className="ml-2"
                   >
                     <Copy className="h-3 w-3 mr-1" />
-                    Compartir
+                    <span className="hidden sm:inline">Compartir</span>
                   </Button>
                 </div>
               </div>
             </CardHeader>
 
-            <CardContent className="flex-1 flex flex-col">
+            <CardContent className="flex-1 flex flex-col p-4 min-h-0">
               {/* Mensajes */}
-              <div className="flex-1 overflow-y-auto space-y-4 mb-4">
+              <div className="flex-1 overflow-y-auto space-y-3 mb-4 pr-2 min-h-0">
                 {loadingChat && (
                   <p className="text-sm text-muted-foreground">Cargando…</p>
-                )}                {messages.map((msg) => (
+                )}
+                {messages.map((msg) => (
                   <div
                     key={msg.id}
                     className={`flex ${
@@ -166,16 +168,16 @@ export default function SharePage() {
                         : 'justify-start'
                     }`}
                   >
-                    <div className="max-w-[70%]">
+                    <div className="max-w-[85%] sm:max-w-[70%] min-w-0">
                       {msg.msg_type === 'system' ? (
                         <Alert>
-                          <AlertDescription className="text-center">
+                          <AlertDescription className="text-center text-sm">
                             {msg.content}
                           </AlertDescription>
                         </Alert>
                       ) : (
                         <div
-                          className={`rounded-lg p-3 ${
+                          className={`rounded-lg p-3 break-words ${
                             msg.sender_id === user?.id
                               ? 'bg-primary text-primary-foreground'
                               : 'bg-muted'
@@ -183,11 +185,13 @@ export default function SharePage() {
                         >
                           {/* Mostrar nombre del usuario si no es el remitente actual */}
                           {msg.sender_id !== user?.id && msg.sender_id && (
-                            <p className="text-xs font-medium opacity-70 mb-1">
+                            <p className="text-xs font-medium opacity-70 mb-1 truncate">
                               {msg.sender_name || msg.sender_email || 'Usuario'}
                             </p>
                           )}
-                          <p className="text-sm">{msg.content}</p>
+                          <p className="text-sm whitespace-pre-wrap break-words">
+                            {msg.content}
+                          </p>
                           <span className="block text-[10px] mt-1 opacity-70">
                             {new Date(msg.created_at).toLocaleTimeString()}
                           </span>
@@ -200,14 +204,15 @@ export default function SharePage() {
               </div>
 
               {/* Input */}
-              <div className="flex gap-2">
+              <div className="flex gap-2 flex-shrink-0">
                 <Input
                   value={draft}
                   onChange={(e) => setDraft(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && handleSend()}
                   placeholder="Escribe un mensaje…"
+                  className="flex-1 min-w-0"
                 />
-                <Button onClick={handleSend} disabled={!draft.trim()}>
+                <Button onClick={handleSend} disabled={!draft.trim()} className="flex-shrink-0">
                   <Send className="h-4 w-4" />
                 </Button>
               </div>
@@ -222,19 +227,19 @@ export default function SharePage() {
                 <Users className="h-4 w-4" />
                 Usuarios Activos
               </CardTitle>
-            </CardHeader><CardContent className="space-y-2">
+            </CardHeader>            <CardContent className="space-y-2 max-h-60 overflow-y-auto">
               {loadingUsers ? (
                 <p className="text-sm text-muted-foreground">Cargando usuarios...</p>
               ) : connectedUsers.length > 0 ? (
                 connectedUsers.map((user) => (
-                  <div key={user.id} className="flex items-center gap-3">
-                    <Avatar className="h-8 w-8">
+                  <div key={user.id} className="flex items-center gap-3 min-w-0">
+                    <Avatar className="h-8 w-8 flex-shrink-0">
                       <AvatarFallback>{user.name[0]?.toUpperCase()}</AvatarFallback>
                       <AvatarImage src={user.avatar_url || ""} />
                     </Avatar>
-                    <div className="flex-1">
-                      <p className="text-sm font-medium">{user.name}</p>
-                      <p className="text-xs text-muted-foreground">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">{user.name}</p>
+                      <p className="text-xs text-muted-foreground truncate">
                         {user.last_seen ? 
                           `Último mensaje: ${new Date(user.last_seen).toLocaleTimeString()}` :
                           'En línea'
