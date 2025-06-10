@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/contexts/AuthContext";
-import { Icons } from "@/components/icons";
+import { Icons } from "@/components/ui/icons";
 import Link from "next/link";
 
 const formSchema = z.object({

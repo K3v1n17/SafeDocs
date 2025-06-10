@@ -6,7 +6,7 @@ import { toast } from 'sonner';
 import { z } from 'zod';
 import { useState } from 'react';
 
-import { Icons } from '@/components/icons';
+import { Icons } from '@/components/ui/icons';
 import { Button } from '@/components/ui/button';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
