@@ -2,6 +2,7 @@ import { useState } from "react"
 import { useAuth } from "@/contexts/AuthContext"
 import { supabase } from "@/lib/supabase"
 import { UploadMetadata } from "../types/Documents.types"
+import { sha256Hex } from "@/lib/utils/index"
 
 export function useDocumentUpload() {
   const { user } = useAuth()
@@ -24,21 +25,6 @@ export function useDocumentUpload() {
       tags: ""
     })
     setUploadProgress(0)
-  }
-
-  // Función para calcular SHA256 del archivo
-  async function calculateChecksum(file: File): Promise<string> {
-    try {
-      const arrayBuffer = await file.arrayBuffer()
-      const hashBuffer = await crypto.subtle.digest('SHA-256', arrayBuffer)
-      const hashArray = Array.from(new Uint8Array(hashBuffer))
-      const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('')
-      return `sha256:${hashHex}`
-    } catch (error) {
-      console.error('Error calculando checksum:', error)
-      // Fallback: generar un hash simple
-      return `sha256:${btoa(file.name + file.size + Date.now()).replace(/[^a-zA-Z0-9]/g, '').substring(0, 32)}`
-    }
   }
 
   // Función para crear verificación inicial
@@ -98,9 +84,10 @@ export function useDocumentUpload() {
       const file = files[i]
       try {
         // Calcular checksum del archivo
-        const checksum = await calculateChecksum(file)
+        const checksum = await sha256Hex(await file.arrayBuffer())
         
-        const filePath = `public/${user?.id}/${Date.now()}_${file.name}`
+        const safeName = file.name.trim().replace(/\s+/g, "_");
+        const filePath = `public/${user?.id}/${Date.now()}_${safeName}`;
 
         // Subir al storage 
         const { error: uploadError } = await supabase.storage

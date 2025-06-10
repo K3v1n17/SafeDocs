@@ -2,6 +2,7 @@ import { useState, useEffect } from "react"
 import { supabase } from "@/lib/supabase"
 import { VerificationResult, VerificationStatus } from "../types/verify.types"
 import { User } from "@supabase/auth-helpers-nextjs"
+import { sha256Hex } from "@/lib/utils/index"
 
 export function useVerification(user: User | null) {
   const [verifying, setVerifying] = useState(false)
@@ -92,14 +93,6 @@ export function useVerification(user: User | null) {
     let equal = 0;
     for (let i = 0; i < a.length; i++) if (a[i] === b[i]) equal++;
     return +(equal * 100 / a.length).toFixed(2);
-  }
-
-  // lib/crypto.ts
-  async function sha256Hex(buffer: ArrayBuffer): Promise<string> {
-    const hash = await crypto.subtle.digest('SHA-256', buffer)
-    return [...new Uint8Array(hash)]
-      .map(b => b.toString(16).padStart(2, '0'))
-      .join('')
   }
 
   const handleVerification = async () => {
