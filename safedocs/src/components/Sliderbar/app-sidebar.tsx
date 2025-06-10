@@ -9,6 +9,7 @@ import {
   Link2,
   ShieldCheck,
   Settings2,
+  Megaphone,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext"
 
@@ -52,6 +53,11 @@ const navMain = [
     title: "Verificar Documentos",
     url: "/verify",
     icon: CheckSquare,
+  },
+    {
+    title: "Anuncios",
+    url: "/chat",
+    icon: Megaphone,
   },
 ];
 
