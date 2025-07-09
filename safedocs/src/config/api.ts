@@ -14,6 +14,7 @@ export const API_CONFIG = {
       verification: '/api/verification',
       chat: '/api/chat',
       sharing: '/api/sharing',
+      admin: '/admin',               // Para administración de usuarios
     }
   },
   

@@ -1,14 +1,15 @@
 // Tipos compartidos para los servicios
 export interface Document {
   id: string
+  owner_id: string
   title: string
   description: string | null
   doc_type: string | null
   tags: string[]
   mime_type: string
   file_size: number
-  owner_id: string  // Tu backend usa owner_id
-  checksum_sha256?: string  // Tu backend incluye checksum
+  file_path: string
+  checksum_sha256: string
   created_at: string
   updated_at: string
 }

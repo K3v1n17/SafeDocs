@@ -10,7 +10,7 @@ import Loading from "@/components/ui/Loading"
 import { UploadDocumentDialog } from "@/modals/UploadDocumentDialog"
 
 import { useHistoryData } from "@/hooks/useHistoryData"
-import { Document, HistoryEntry } from "@/services"
+import { Document } from "@/services"
 
 // Componentes
 import { StatsCards } from "@/components/History/StatsCards"
@@ -254,7 +254,7 @@ export default function HistoryPage() {
         />
 
         {/* Activity History */}
-        <ActivityHistory entries={filteredEntries} documents={documents} totalEntries={historyEntries.length} />
+        {/* <ActivityHistory entries={filteredEntries} documents={documents} totalEntries={historyEntries.length} /> */}
       </div>
     </div>
   )

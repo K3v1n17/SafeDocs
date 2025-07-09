@@ -9,6 +9,7 @@ import {
   Link2,
   ShieldCheck,
   Settings2,
+  Crown,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext"
 
@@ -55,11 +56,18 @@ const navMain = [
   },
 ];
 
+// Pestaña de admin solo para usuarios administradores
+const adminNavItem = {
+  title: "Administración",
+  url: "/admin",
+  icon: Crown,
+};
+
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const { user } = useAuth();
 
   // Get user display name from metadata or email
-  const userName = user?.user_metadata?.full_name || 
+  const userName = user?.name || 
                    user?.email?.split('@')[0] || 
                    "Usuario Safedocs";
   
@@ -67,8 +75,20 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const userData = {
     name: userName,
     email: user?.email || "usuario@safedocs.com",
-    avatar: user?.user_metadata?.avatar_url || "/avatars/default-avatar.png",
+    avatar: "/avatars/default-avatar.png",
   };
+
+  // Crear navegación dinámica basada en el rol del usuario
+  const navigationItems = React.useMemo(() => {
+    const items = [...navMain];
+    
+    // Agregar pestaña de admin solo si el usuario es administrador
+    if (user?.role === 'admin') {
+      items.push(adminNavItem);
+    }
+    
+    return items;
+  }, [user?.role]);
 
   return (
     <Sidebar collapsible="icon" {...props}>
@@ -76,7 +96,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         <TeamSwitcher teams={teams} />
       </SidebarHeader>
       <SidebarContent>
-        <NavMain items={navMain} />
+        <NavMain items={navigationItems} />
       </SidebarContent>
       <SidebarFooter>
         <NavUser user={userData} />

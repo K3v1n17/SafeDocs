@@ -1,7 +1,17 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
-import { documentService, historyService } from '@/services'
-import { Document, HistoryEntry } from '@/services/types'
+import { documentService } from '@/services'
+import { Document } from '@/services/types'
+
+// Definir HistoryEntry localmente ya que se simula
+export interface HistoryEntry {
+  id: string
+  action: 'upload' | 'edit' | 'delete' | 'share' | 'verify'
+  document_id: string
+  details: string
+  created_at: string
+  user_id: string
+}
 
 export interface UseHistoryDataReturn {
   documents: Document[]
@@ -25,6 +35,61 @@ export const useHistoryData = (): UseHistoryDataReturn => {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
+  // Función para simular entradas del historial basadas en documentos
+  const generateHistoryEntries = (documents: Document[]): HistoryEntry[] => {
+    const entries: HistoryEntry[] = []
+    
+    documents.forEach(doc => {
+      // Entrada de creación/upload
+      entries.push({
+        id: `${doc.id}-upload`,
+        action: 'upload',
+        document_id: doc.id,
+        details: `Documento "${doc.title}" subido exitosamente`,
+        created_at: doc.created_at,
+        user_id: doc.owner_id
+      })
+      
+      // Si ha sido actualizado, agregar entrada de edición
+      if (doc.updated_at && doc.updated_at !== doc.created_at) {
+        entries.push({
+          id: `${doc.id}-edit`,
+          action: 'edit',
+          document_id: doc.id,
+          details: `Documento "${doc.title}" actualizado`,
+          created_at: doc.updated_at,
+          user_id: doc.owner_id
+        })
+      }
+      
+      // Si está marcado como público, agregar entrada de compartir
+      if ((doc as any).is_public) {
+        entries.push({
+          id: `${doc.id}-share`,
+          action: 'share',
+          document_id: doc.id,
+          details: `Documento "${doc.title}" compartido públicamente`,
+          created_at: doc.updated_at || doc.created_at,
+          user_id: doc.owner_id
+        })
+      }
+      
+      // Si está verificado, agregar entrada de verificación
+      if ((doc as any).verification_status === 'verified') {
+        entries.push({
+          id: `${doc.id}-verify`,
+          action: 'verify',
+          document_id: doc.id,
+          details: `Documento "${doc.title}" verificado exitosamente`,
+          created_at: doc.updated_at || doc.created_at,
+          user_id: doc.owner_id
+        })
+      }
+    })
+    
+    return entries.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+  }
+
   const fetchData = async () => {
     if (!user?.id) return
     
@@ -32,17 +97,27 @@ export const useHistoryData = (): UseHistoryDataReturn => {
       setLoading(true)
       setError(null)
 
-      const [documentsData, historyData] = await Promise.all([
-        documentService.getDocuments(), // Cambio: usar método correcto
-        historyService.getHistory(user.id) // Cambio: usar método correcto
-      ])
-
-      setHistoryEntries(historyData.data?.entries || [])
-      setDocuments(documentsData.data?.documents || [])
+      // Obtener solo documentos del backend
+      const documentsResponse = await documentService.getDocuments()
+      
+      if (documentsResponse.success) {
+        const documents = documentsResponse.data.documents
+        setDocuments(documents)
+        
+        // Generar historial simulado basado en documentos
+        const simulatedHistory = generateHistoryEntries(documents)
+        setHistoryEntries(simulatedHistory)
+      } else {
+        setError(documentsResponse.error || 'Error al obtener documentos')
+        setDocuments([])
+        setHistoryEntries([])
+      }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Error desconocido'
       setError(errorMessage)
       console.error("Error fetching data:", err)
+      setDocuments([])
+      setHistoryEntries([])
     } finally {
       setLoading(false)
     }
@@ -58,14 +133,11 @@ export const useHistoryData = (): UseHistoryDataReturn => {
     }
 
     try {
-      await documentService.deleteDocument(documentId)
+      const result = await documentService.deleteDocument(documentId)
       
-      // Registrar la acción en el historial
-      await historyService.create({
-        action: "delete",
-        document_id: documentId,
-        details: `Documento "${documentTitle}" eliminado`,
-      })
+      if (!result.success) {
+        throw new Error(result.error || 'Error al eliminar documento')
+      }
 
       // Refrescar datos
       await fetchData()
@@ -89,14 +161,11 @@ export const useHistoryData = (): UseHistoryDataReturn => {
     }
 
     try {
-      await documentService.updateDocument(documentId, updateData)
+      const result = await documentService.updateDocument(documentId, updateData)
       
-      // Registrar la acción en el historial
-      await historyService.create({
-        action: "upload", // Cambio: usar acción permitida por el tipo
-        document_id: documentId,
-        details: `Documento "${updateData.title || 'Sin título'}" actualizado`,
-      })
+      if (!result.success) {
+        throw new Error(result.error || 'Error al actualizar documento')
+      }
 
       // Refrescar datos
       await fetchData()

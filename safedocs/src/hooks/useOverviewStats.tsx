@@ -1,13 +1,23 @@
 import { useState, useEffect } from "react"
-import { apiClient } from "@/lib/api-client"
-import { API_CONFIG } from "@/config/api"
+import { documentService } from "@/services/document.service"
 import { AuthUser } from "@/services/auth.service"
+import { calculateDocumentStats } from "@/lib/stats-calculator"
+
+// Tipos para las estadísticas
+interface DocumentStats {
+  documentCount: number
+  sharedCount: number
+  verifiedCount: number
+  authorizedUsers: number
+}
 
 export function useOverviewStats(user: AuthUser | null) {
-  const [documentCount, setDocumentCount] = useState(0)
-  const [sharedCount, setSharedCount] = useState(0)
-  const [verifiedCount, setVerifiedCount] = useState(0)
-  const [authorizedUsers, setAuthorizedUsers] = useState(0)
+  const [stats, setStats] = useState<DocumentStats>({
+    documentCount: 0,
+    sharedCount: 0,
+    verifiedCount: 0,
+    authorizedUsers: 0
+  })
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
@@ -20,30 +30,40 @@ export function useOverviewStats(user: AuthUser | null) {
       setIsLoading(true)
       
       try {
-        // Obtener estadísticas del dashboard desde el backend
-        const response = await apiClient.get('/api/dashboard/stats')
+        // Obtener documentos del usuario con paginación adecuada
+        const response = await documentService.getDocuments({}, 1, 100) // Ajusta según necesites
         
         if (response.success && response.data) {
-          const stats = response.data
-          setDocumentCount(stats.documentCount || 0)
-          setSharedCount(stats.sharedCount || 0)
-          setVerifiedCount(stats.verifiedCount || 0)
-          setAuthorizedUsers(stats.authorizedUsers || 0)
+          const documents = response.data.documents
+          
+          // Calcular estadísticas usando la función centralizada
+          const calculatedStats = calculateDocumentStats(documents)
+          setStats(calculatedStats)
+          
+          console.log('📊 Estadísticas calculadas:', {
+            total: documents.length,
+            stats: calculatedStats,
+            documentsSample: documents.slice(0, 2) // Muestra los primeros 2 documentos para debug
+          })
         } else {
-          console.error('Error fetching stats:', response.error)
-          // Valores por defecto en caso de error
-          setDocumentCount(0)
-          setSharedCount(0)
-          setVerifiedCount(0)
-          setAuthorizedUsers(0)
+          console.error('Error fetching documents for stats:', response.error)
+          // Mantener valores por defecto
+          setStats({
+            documentCount: 0,
+            sharedCount: 0,
+            verifiedCount: 0,
+            authorizedUsers: 5
+          })
         }
       } catch (error) {
         console.error('Error in fetchStats:', error)
-        // Valores por defecto en caso de error
-        setDocumentCount(0)
-        setSharedCount(0)
-        setVerifiedCount(0)
-        setAuthorizedUsers(0)
+        // Mantener valores por defecto
+        setStats({
+          documentCount: 0,
+          sharedCount: 0,
+          verifiedCount: 0,
+          authorizedUsers: 5
+        })
       } finally {
         setIsLoading(false)
       }
@@ -53,12 +73,7 @@ export function useOverviewStats(user: AuthUser | null) {
   }, [user])
 
   return {
-    stats: {
-      documentCount,
-      sharedCount,
-      verifiedCount,
-      authorizedUsers,
-    },
+    stats,
     isLoading
   }
 }

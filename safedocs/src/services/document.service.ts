@@ -83,10 +83,43 @@ class DocumentService implements IDocumentService {
       }
 
       const response = await apiClient.get(`${this.baseURL}?${params}`)
-      return response.data
+      
+      // Tu backend devuelve directamente un array de documentos
+      if (response.success && Array.isArray(response.data)) {
+        return {
+          success: true,
+          data: {
+            documents: response.data,
+            total: response.data.length,
+            page,
+            limit
+          }
+        }
+      }
+      
+      // Si no es un array, asumir que es el formato esperado
+      return response.data || {
+        success: false,
+        data: {
+          documents: [],
+          total: 0,
+          page,
+          limit
+        },
+        error: 'Formato de respuesta inesperado'
+      }
     } catch (error: any) {
       console.error('Error fetching documents:', error)
-      throw new Error(error.response?.data?.message || 'Error al obtener documentos')
+      return {
+        success: false,
+        data: {
+          documents: [],
+          total: 0,
+          page,
+          limit
+        },
+        error: error.message || 'Error al obtener documentos'
+      }
     }
   }
 
@@ -111,7 +144,6 @@ class DocumentService implements IDocumentService {
       const formData = new FormData()
       formData.append('file', data.file)
       formData.append('title', data.title)
-      formData.append('isPublic', (data.isPublic || false).toString())
       
       if (data.tags?.length) {
         formData.append('tags', JSON.stringify(data.tags))
@@ -146,7 +178,13 @@ class DocumentService implements IDocumentService {
       throw new Error(result.message || 'Error al subir archivo')
     }
     
-    return result
+    return {
+      success: true,
+      data: {
+        document: result,
+        uploadUrl: result.file_path
+      }
+    }
   }
 
   /**
@@ -155,7 +193,10 @@ class DocumentService implements IDocumentService {
   async updateDocument(id: string, data: Partial<Document>): Promise<DocumentResponse> {
     try {
       const response = await apiClient.patch(`${this.baseURL}/${id}`, data)
-      return response.data
+      return {
+        success: true,
+        data: response.data
+      }
     } catch (error: any) {
       console.error('Error updating document:', error)
       throw new Error(error.response?.data?.message || 'Error al actualizar documento')
@@ -168,10 +209,15 @@ class DocumentService implements IDocumentService {
   async deleteDocument(id: string): Promise<{ success: boolean; error?: string }> {
     try {
       const response = await apiClient.delete(`${this.baseURL}/${id}`)
-      return response.data
+      return {
+        success: true
+      }
     } catch (error: any) {
       console.error('Error deleting document:', error)
-      throw new Error(error.response?.data?.message || 'Error al eliminar documento')
+      return {
+        success: false,
+        error: error.response?.data?.message || 'Error al eliminar documento'
+      }
     }
   }
 

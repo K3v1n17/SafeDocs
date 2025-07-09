@@ -1,8 +1,7 @@
 import { useState } from "react"
 import { useAuth } from "@/contexts/AuthContext"
-import { documentService, historyService } from "@/services"
+import { documentService } from "@/services"
 import { UploadMetadata } from "../types/Documents.types"
-import { sha256Hex } from "@/lib/utils/index"
 import { API_CONFIG } from "@/config/api"
 
 export function useDocumentUpload() {
@@ -28,46 +27,6 @@ export function useDocumentUpload() {
     setUploadProgress(0)
   }
 
-  // Función para crear verificación inicial usando el backend
-  async function createInitialVerification(documentId: string, checksum: string) {
-    try {
-      const initialStatus = 'verified'
-      const initialIntegrity = 100
-      const initialDetails = [
-        'Documento subido correctamente',
-        'Hash inicial calculado',
-        'Archivo íntegro al momento de subida',
-        'Verificación inicial completada'
-      ]
-
-      // Crear verificación a través del backend de verificaciones
-      const response = await fetch(`${API_CONFIG.backend.baseUrl}/api/verification`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('safedocs_access_token')}`,
-        },
-        body: JSON.stringify({
-          document_id: documentId,
-          run_by: user?.id,
-          status: initialStatus,
-          integrity_pct: initialIntegrity,
-          hash_checked: checksum,
-          details: initialDetails
-        })
-      })
-
-      if (response.ok) {
-        return true
-      }
-
-      return false
-    } catch (error) {
-      console.error('Error en createInitialVerification:', error)
-      return false
-    }
-  }
-
   const handleUpload = async (): Promise<boolean> => {
     if (!metadata.docType) {
       alert("Por favor, selecciona el tipo de documento")
@@ -89,23 +48,23 @@ export function useDocumentUpload() {
     for (let i = 0; i < files.length; i++) {
       const file = files[i]
       try {
-        // Calcular checksum del archivo
-        const checksum = await sha256Hex(await file.arrayBuffer())
-        
         // Crear FormData para enviar el archivo al backend
         const formData = new FormData()
         formData.append('file', file)
         formData.append('title', files.length > 1 ? `${metadata.title} - ${file.name}` : metadata.title)
         formData.append('description', metadata.description || '')
         formData.append('doc_type', metadata.docType!)
-        formData.append('checksum_sha256', checksum)
         
         if (metadata.tags) {
           const tags = metadata.tags
             .split(",")
             .map((tag) => tag.trim())
             .filter((tag) => tag.length > 0)
-          formData.append('tags', JSON.stringify(tags))
+          
+          // Enviar cada tag individualmente para que el backend lo reciba como array
+          tags.forEach(tag => {
+            formData.append('tags[]', tag)
+          })
         }
 
         // Subir archivo y crear documento a través del backend
@@ -118,25 +77,11 @@ export function useDocumentUpload() {
         })
 
         if (!response.ok) {
-          throw new Error(`Error ${response.status}: ${response.statusText}`)
+          const errorData = await response.json().catch(() => ({}))
+          throw new Error(errorData.message || `Error ${response.status}: ${response.statusText}`)
         }
 
         const documentData = await response.json()
-
-        // Crear entrada en el historial
-        await historyService.create({
-          action: "upload",
-          document_id: documentData.id,
-          details: `Documento "${documentData.title}" subido exitosamente`,
-        })
-
-        // Crear verificación inicial para el documento (mantener Supabase para verificaciones)
-        if (documentData?.id) {
-          const verificationCreated = await createInitialVerification(documentData.id, checksum)
-          if (!verificationCreated) {
-            console.warn(`No se pudo crear la verificación inicial para ${file.name}`)
-          }
-        }
 
         setUploadProgress(Math.round(((i + 1) / files.length) * 100))
       } catch (error: unknown) {
