@@ -6,38 +6,17 @@ import { useRouter } from "next/navigation"
 import { DashboardTitle } from "@/components/Sliderbar/DashboardTitle"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { FileText } from "lucide-react"
-import { supabase } from "@/lib/supabase"
 import Loading from "@/components/ui/Loading"
 import { UploadDocumentDialog } from "@/modals/UploadDocumentDialog"
+
+import { useHistoryData } from "@/hooks/useHistoryData"
+import { Document, HistoryEntry } from "@/services"
 
 // Componentes
 import { StatsCards } from "@/components/History/StatsCards"
 import { DocumentCard } from "@/components/History/DocumentCard"
 import { DocumentFilters } from "@/components/History/DocumentFilters"
 import { ActivityHistory } from "@/components/History/ActivityHistory"
-
-interface Document {
-  id: string
-  title: string
-  description: string | null
-  doc_type: string | null
-  tags: string[]
-  mime_type: string
-  file_size: number
-  created_at: string
-  updated_at: string
-}
-
-interface HistoryEntry {
-  id: number
-  action: "upload" | "download" | "share" | "verify" | "view" | "delete"
-  document_id: string | null
-  user_id: string | null
-  details: string | null
-  ip_address: string | null
-  user_agent: string | null
-  created_at: string
-}
 
 interface EditingDocument {
   title: string
@@ -52,9 +31,6 @@ export default function HistoryPage() {
   const [searchTerm, setSearchTerm] = useState("")
   const [filterAction, setFilterAction] = useState("all")
   const [filterDate, setFilterDate] = useState("all")
-  const [historyEntries, setHistoryEntries] = useState<HistoryEntry[]>([])
-  const [documents, setDocuments] = useState<Document[]>([])
-  const [loadingData, setLoadingData] = useState(true)
   const [editingDoc, setEditingDoc] = useState<string | null>(null)
   const [editingData, setEditingData] = useState<EditingDocument>({
     title: "",
@@ -63,6 +39,17 @@ export default function HistoryPage() {
     tags: [],
   })
   const [expandedDoc, setExpandedDoc] = useState<string | null>(null)
+
+  // Usar el hook personalizado para manejar los datos
+  const {
+    documents,
+    historyEntries,
+    loading: loadingData,
+    error,
+    refetch: fetchData,
+    handleDeleteDocument: deleteDocument,
+    handleUpdateDocument,
+  } = useHistoryData()
 
   const documentTypes = [
     "Cédula de Identidad",
@@ -80,65 +67,13 @@ export default function HistoryPage() {
     }
   }, [user, loading, router])
 
-  useEffect(() => {
-    if (user) {
-      fetchData()
-    }
-  }, [user])
-
-  const fetchData = async () => {
-    try {
-      setLoadingData(true)
-
-      const { data: documentsData, error: documentsError } = await supabase
-        .from("documents")
-        .select("*")
-        .eq("owner_id", user?.id)
-        .order("created_at", { ascending: false })
-
-      if (documentsError) {
-        console.error("Error fetching documents:", documentsError)
-        return
-      }
-
-      const { data: historyData, error: historyError } = await supabase
-        .from("history")
-        .select("*")
-        .eq("user_id", user?.id)
-        .order("created_at", { ascending: false })
-
-      if (historyError) {
-        console.error("Error fetching history:", historyError)
-        return
-      }
-
-      setHistoryEntries(historyData || [])
-      setDocuments(documentsData || [])
-    } catch (error) {
-      console.error("Error:", error)
-    } finally {
-      setLoadingData(false)
-    }
-  }
-
   const handleDeleteDocument = async (documentId: string, documentTitle: string) => {
-    if (!confirm(`¿Estás seguro de que quieres eliminar el documento "${documentTitle}"?`)) {
-      return
-    }
-
     try {
-      const { error } = await supabase.from("documents").delete().eq("id", documentId).eq("owner_id", user?.id)
-
-      if (error) {
-        alert("Error al eliminar el documento: " + error.message)
-        return
-      }
-
+      await deleteDocument(documentId, documentTitle)
       alert("Documento eliminado exitosamente")
-      await fetchData()
     } catch (error) {
       console.error("Error deleting document:", error)
-      alert("Error al eliminar el documento")
+      alert(error instanceof Error ? error.message : "Error al eliminar el documento")
     }
   }
 
@@ -149,30 +84,19 @@ export default function HistoryPage() {
     }
 
     try {
-      const { error } = await supabase
-        .from("documents")
-        .update({
-          title: editingData.title.trim(),
-          description: editingData.description.trim() || null,
-          doc_type: editingData.doc_type || null,
-          tags: editingData.tags,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", documentId)
-        .eq("owner_id", user?.id)
-
-      if (error) {
-        alert("Error al actualizar el documento: " + error.message)
-        return
-      }
+      await handleUpdateDocument(documentId, {
+        title: editingData.title.trim(),
+        description: editingData.description.trim() || undefined,
+        doc_type: editingData.doc_type || undefined,
+        tags: editingData.tags,
+      })
 
       alert("Documento actualizado exitosamente")
       setEditingDoc(null)
       setEditingData({ title: "", description: "", doc_type: "", tags: [] })
-      await fetchData()
     } catch (error) {
       console.error("Error updating document:", error)
-      alert("Error al actualizar el documento")
+      alert(error instanceof Error ? error.message : "Error al actualizar el documento")
     }
   }
 
@@ -270,7 +194,7 @@ export default function HistoryPage() {
             <h2 className="text-2xl font-bold tracking-tight">Mis Documentos y Actividades</h2>
             <p className="text-gray-600 mt-2">Gestiona y revisa toda tu actividad documental</p>
           </div>
-          <UploadDocumentDialog />
+          <UploadDocumentDialog onUploadComplete={fetchData} />
         </div>
 
         {/* Stats Cards */}

@@ -1,18 +1,18 @@
-'use client';
+"use client";
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { supabase } from '@/lib/supabase'; /* <-- usa el mismo cliente */
-import { Session, User } from '@supabase/supabase-js';
+import { authService, AuthUser, AuthResponse, AuthSession } from '@/services/auth.service';
+import { API_CONFIG } from '@/config/api';
 import { useRouter } from 'next/navigation';
 
 /* ─────────────────────────────────────────────────── */
 interface AuthContextProps {
-  user: User | null;
-  session: Session | null;
+  user: AuthUser | null;
+  session: AuthSession | null;
   loading: boolean;
   signInWithGoogle: () => Promise<void>;
-  signInWithEmail: (email: string, password: string) => Promise<{ user: User | null }>;
-  signUpWithEmail: (email: string, password: string, fullName: string) => Promise<{ user: User | null }>;
+  signInWithEmail: (email: string, password: string) => Promise<{ user: AuthUser | null }>;
+  signUpWithEmail: (email: string, password: string, fullName: string, username: string) => Promise<{ user: AuthUser | null }>;
   signOut: () => Promise<void>;
 }
 
@@ -28,102 +28,157 @@ const AuthContext = createContext<AuthContextProps>({
 
 /* ─────────────────────────────────────────────────── */
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
+  const [user, setUser] = useState<AuthUser | null>(null);
+  const [session, setSession] = useState<AuthSession | null>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
-  /* 1️⃣  Sesión al montar */
+  /* 1️⃣  Cargar sesión al montar */
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) {
-        setUser(session.user);
-        setSession(session);
+    const loadSession = async () => {
+      console.log('🔐 Cargando sesión inicial...');
+      try {
+        // Verificar si hay tokens válidos almacenados
+        if (!authService.hasValidTokens()) {
+          console.log('🔐 No hay tokens válidos, usuario no autenticado');
+          setUser(null);
+          setSession(null);
+          return;
+        }
+
+        // Intentar obtener el usuario actual del backend
+        const currentUser = await authService.getCurrentUser();
+        console.log('🔐 Usuario actual del backend:', currentUser);
+        
+        if (currentUser) {
+          setUser(currentUser);
+          
+          // Obtener tokens almacenados para crear la sesión
+          const token = localStorage.getItem('safedocs_access_token');
+          const refreshToken = localStorage.getItem('safedocs_refresh_token');
+          const expiresAt = localStorage.getItem('safedocs_expires_at');
+          
+          if (token && refreshToken) {
+            const session = {
+              access_token: token,
+              refresh_token: refreshToken,
+              expires_at: expiresAt ? parseInt(expiresAt) : undefined
+            };
+            console.log('🔐 Sesión restaurada:', session);
+            setSession(session);
+          }
+        } else {
+          // Si no se puede obtener el usuario, limpiar los tokens
+          console.log('🔐 No se pudo obtener el usuario del backend, limpiando tokens');
+          authService.logout();
+          setUser(null);
+          setSession(null);
+        }
+      } catch (error) {
+        console.error('Error loading session:', error);
+        // En caso de error, limpiar la sesión
+        authService.logout();
+        setUser(null);
+        setSession(null);
+      } finally {
+        console.log('🔐 Finalizando carga de sesión');
+        setLoading(false);
       }
-      setLoading(false);
-    });
+    };
 
-    /* 2️⃣  Suscripción a cambios */
-    const {
-      data: { subscription }
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
-      setSession(session ?? null);
-    });
-
-    return () => subscription.unsubscribe();
+    loadSession();
   }, []);
 
-  /* 3️⃣  Login Google */
+  /* 2️⃣  Google Sign In (no disponible en modo backend) */
   const signInWithGoogle = async () => {
-    setLoading(true);
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: { redirectTo: `${window.location.origin}/overview` }
-    });
-    if (error) console.error('Error al iniciar con Google:', error.message);
-    setLoading(false);
+    console.warn('Google Sign In no está disponible cuando se usa el backend NestJS');
+    return;
   };
   
-  /* 4️⃣  Login con Email y Contraseña */
+  /* 3️⃣  Login con Email y Contraseña */
   const signInWithEmail = async (email: string, password: string) => {
     try {
-      const { error, data } = await supabase.auth.signInWithPassword({
-        email,
-        password
-      });
+      setLoading(true);
+      console.log('🔐 AuthContext - Iniciando login...');
       
-      if (error) {
-        throw new Error(error.message);
+      const response: AuthResponse = await authService.login({ email, password });
+      console.log('🔐 AuthContext - Respuesta del authService:', response);
+      
+      if (response.error) {
+        throw new Error(response.error);
       }
       
-      if (data?.user) {
-        router.push('/overview');
-      }
+      // Los datos ya están en la estructura correcta desde authService
+      const user = response.user;
+      const session = response.session;
       
-      return { user: data?.user || null };
+      console.log('🔐 AuthContext - Usuario extraído:', user);
+      console.log('🔐 AuthContext - Sesión extraída:', session);
+      
+      if (user && session) {
+        setUser(user);
+        setSession(session);
+        console.log('🔐 AuthContext - Estados actualizados correctamente');
+        
+        // No hacer redirección aquí, que se encargue el componente que llama
+        return { user };
+      } else {
+        console.error('🔐 AuthContext - No se pudo extraer usuario o sesión');
+        throw new Error('Error en la autenticación: datos incompletos');
+      }
     } catch (error: any) {
       console.error('Error al iniciar sesión:', error.message);
+      // Limpiar estados en caso de error
+      setUser(null);
+      setSession(null);
       throw error;
+    } finally {
+      setLoading(false);
     }
   };
   
-  /* 5️⃣  Registro con Email y Contraseña */
-  const signUpWithEmail = async (email: string, password: string, fullName: string) => {
+  /* 4️⃣  Registro con Email y Contraseña */
+  const signUpWithEmail = async (email: string, password: string, fullName: string, username: string = '') => {
     try {
-      const { error, data } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            full_name: fullName
-          },
-          emailRedirectTo: `${window.location.origin}/login`
-        }
+      setLoading(true);
+      const response: AuthResponse = await authService.register({ 
+        email, 
+        password, 
+        name: fullName,
+        username: username || email.split('@')[0] // Usar parte del email como username por defecto
       });
       
-      if (error) {
-        throw new Error(error.message);
+      if (response.error) {
+        throw new Error(response.error);
       }
       
-      // Si las identidades están vacías, puede indicar que el correo ya existe
-      if (!data.user || data.user.identities?.length === 0) {
-        throw new Error('Este correo ya podría estar registrado. Intenta iniciar sesión o usar otro correo.');
+      // Los datos ya están en la estructura correcta desde authService
+      const user = response.user;
+      const session = response.session;
+      
+      if (user) {
+        if (session) {
+          setUser(user);
+          setSession(session);
+        }
       }
       
-      return { user: data.user };
+      return { user: user || null };
     } catch (error: any) {
       console.error('Error al registrarse:', error.message);
       throw error;
+    } finally {
+      setLoading(false);
     }
   };
 
-  /* 6️⃣  Logout */
+  /* 5️⃣  Logout */
   const signOut = async () => {
     setLoading(true);
     try {
-      const { error } = await supabase.auth.signOut();
-      if (error) throw new Error(error.message);
+      await authService.logout();
+      setUser(null);
+      setSession(null);
       router.push('/');
     } catch (error: any) {
       console.error('Error al cerrar sesión:', error.message);

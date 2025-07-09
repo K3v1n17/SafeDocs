@@ -1,8 +1,9 @@
 import { useState } from "react"
 import { useAuth } from "@/contexts/AuthContext"
-import { supabase } from "@/lib/supabase"
+import { documentService, historyService } from "@/services"
 import { UploadMetadata } from "../types/Documents.types"
 import { sha256Hex } from "@/lib/utils/index"
+import { API_CONFIG } from "@/config/api"
 
 export function useDocumentUpload() {
   const { user } = useAuth()
@@ -27,7 +28,7 @@ export function useDocumentUpload() {
     setUploadProgress(0)
   }
 
-  // Función para crear verificación inicial
+  // Función para crear verificación inicial usando el backend
   async function createInitialVerification(documentId: string, checksum: string) {
     try {
       const initialStatus = 'verified'
@@ -39,9 +40,14 @@ export function useDocumentUpload() {
         'Verificación inicial completada'
       ]
 
-      const { error } = await supabase
-        .from('document_verifications')
-        .insert({
+      // Crear verificación a través del backend de verificaciones
+      const response = await fetch(`${API_CONFIG.backend.baseUrl}/api/verification`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('safedocs_access_token')}`,
+        },
+        body: JSON.stringify({
           document_id: documentId,
           run_by: user?.id,
           status: initialStatus,
@@ -49,13 +55,13 @@ export function useDocumentUpload() {
           hash_checked: checksum,
           details: initialDetails
         })
+      })
 
-      if (error) {
-        console.error('Error creando verificación inicial:', error)
-        throw error
+      if (response.ok) {
+        return true
       }
 
-      return true
+      return false
     } catch (error) {
       console.error('Error en createInitialVerification:', error)
       return false
@@ -86,47 +92,45 @@ export function useDocumentUpload() {
         // Calcular checksum del archivo
         const checksum = await sha256Hex(await file.arrayBuffer())
         
-        const safeName = file.name.trim().replace(/\s+/g, "_");
-        const filePath = `public/${user?.id}/${Date.now()}_${safeName}`;
-
-        // Subir al storage 
-        const { error: uploadError } = await supabase.storage
-          .from("archivos")
-          .upload(filePath, file)
-
-        if (uploadError) {
-          throw new Error(uploadError.message)
+        // Crear FormData para enviar el archivo al backend
+        const formData = new FormData()
+        formData.append('file', file)
+        formData.append('title', files.length > 1 ? `${metadata.title} - ${file.name}` : metadata.title)
+        formData.append('description', metadata.description || '')
+        formData.append('doc_type', metadata.docType!)
+        formData.append('checksum_sha256', checksum)
+        
+        if (metadata.tags) {
+          const tags = metadata.tags
+            .split(",")
+            .map((tag) => tag.trim())
+            .filter((tag) => tag.length > 0)
+          formData.append('tags', JSON.stringify(tags))
         }
 
-        // Insertar documento en la base de datos
-        const { data: documentData, error: insertError } = await supabase
-          .from("documents")
-          .insert({
-            owner_id: user?.id,
-            title: files.length > 1 ? `${metadata.title} - ${file.name}` : metadata.title,
-            description: metadata.description || null,
-            doc_type: metadata.docType,
-            tags: metadata.tags
-              ? metadata.tags
-                  .split(",")
-                  .map((tag) => tag.trim())
-                  .filter((tag) => tag.length > 0)
-              : [],
-            mime_type: file.type,
-            file_size: file.size,
-            file_path: filePath,
-            checksum_sha256: checksum,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          })
-          .select('id')
-          .single()
+        // Subir archivo y crear documento a través del backend
+        const response = await fetch(`${API_CONFIG.backend.baseUrl}${API_CONFIG.backend.endpoints.documents}/upload`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('safedocs_access_token')}`,
+          },
+          body: formData
+        })
 
-        if (insertError) {
-          throw new Error(insertError.message)
+        if (!response.ok) {
+          throw new Error(`Error ${response.status}: ${response.statusText}`)
         }
 
-        // Crear verificación inicial para el documento
+        const documentData = await response.json()
+
+        // Crear entrada en el historial
+        await historyService.create({
+          action: "upload",
+          document_id: documentData.id,
+          details: `Documento "${documentData.title}" subido exitosamente`,
+        })
+
+        // Crear verificación inicial para el documento (mantener Supabase para verificaciones)
         if (documentData?.id) {
           const verificationCreated = await createInitialVerification(documentData.id, checksum)
           if (!verificationCreated) {

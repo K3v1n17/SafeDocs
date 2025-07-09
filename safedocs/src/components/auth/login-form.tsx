@@ -5,6 +5,7 @@ import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 import { z } from 'zod';
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 
 import { Button } from "@/components/ui/button";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -21,6 +22,7 @@ const formSchema = z.object({
 export function LoginForm() {
   const { signInWithGoogle, signInWithEmail } = useAuth();
   const [loginError, setLoginError] = useState<string | null>(null);
+  const router = useRouter();
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -39,6 +41,9 @@ export function LoginForm() {
     try {
       await signInWithEmail(data.email, data.password);
       toast.success('Inicio de sesión exitoso');
+      
+      // Redirigir al dashboard después del login exitoso
+      router.push('/overview');
     } catch (error: any) {
       if (error.message.includes('Invalid login credentials')) {
         setLoginError('Credenciales inválidas. Por favor verifica tu correo y contraseña.');

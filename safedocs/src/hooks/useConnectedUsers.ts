@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { apiClient } from '@/lib/api-client';
+import { API_CONFIG } from '@/config/api';
 
 export interface ConnectedUser {
   id: string;
@@ -13,7 +14,7 @@ export const useConnectedUsers = (shareUuid: string) => {
   const [users, setUsers] = useState<ConnectedUser[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Función para obtener usuarios
+  // Función para obtener usuarios conectados desde el backend
   const fetchUsers = async () => {
     if (!shareUuid) {
       setUsers([]);
@@ -22,39 +23,14 @@ export const useConnectedUsers = (shareUuid: string) => {
     }
 
     try {
-      // Obtener los últimos usuarios que han enviado mensajes
-      const { data: messages, error } = await supabase
-        .from('document_share_messages')
-        .select('sender_id, created_at')
-        .eq('share_id', shareUuid)
-        .not('sender_id', 'is', null)
-        .gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
-        .order('created_at', { ascending: false });
-
-      if (error) {
-        console.error('Error fetching messages:', error);
+      const response = await apiClient.get(`/api/sharing/${shareUuid}/connected-users`);
+      
+      if (response.success && response.data) {
+        setUsers(response.data.users || []);
+      } else {
+        console.error('Error fetching connected users:', response.error);
         setUsers([]);
-        return;
       }
-
-      if (!messages || messages.length === 0) {
-        setUsers([]);
-        return;
-      }
-
-      // Crear usuarios únicos con datos básicos
-      const uniqueUserIds = [...new Set(messages.map(msg => msg.sender_id))];
-      const basicUsers: ConnectedUser[] = uniqueUserIds.map(userId => {
-        const lastMessage = messages.find(msg => msg.sender_id === userId);
-        return {
-          id: userId,
-          email: `usuario-${userId.substring(0, 8)}`,
-          name: `Usuario ${userId.substring(0, 8)}`,
-          last_seen: lastMessage?.created_at
-        };
-      });
-
-      setUsers(basicUsers);
     } catch (error) {
       console.error('Error in fetchUsers:', error);
       setUsers([]);
@@ -63,36 +39,50 @@ export const useConnectedUsers = (shareUuid: string) => {
     }
   };
 
-  // Efecto inicial para cargar usuarios
+  // Función para conectar un usuario
+  const connectUser = async (userData: Partial<ConnectedUser>) => {
+    try {
+      const response = await apiClient.post(`/api/sharing/${shareUuid}/connect`, userData);
+      
+      if (response.success) {
+        // Refrescar lista de usuarios
+        await fetchUsers();
+      }
+    } catch (error) {
+      console.error('Error connecting user:', error);
+    }
+  };
+
+  // Función para desconectar un usuario
+  const disconnectUser = async (userId: string) => {
+    try {
+      const response = await apiClient.post(`/api/sharing/${shareUuid}/disconnect`, { userId });
+      
+      if (response.success) {
+        // Refrescar lista de usuarios
+        await fetchUsers();
+      }
+    } catch (error) {
+      console.error('Error disconnecting user:', error);
+    }
+  };
+
   useEffect(() => {
     fetchUsers();
-  }, [shareUuid]);
-
-  // Suscripción en tiempo real para actualizar usuarios cuando lleguen nuevos mensajes
-  useEffect(() => {
-    if (!shareUuid) return;
-
-    const channel = supabase
-      .channel(`connected-users-${shareUuid}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'document_share_messages',
-          filter: `share_id=eq.${shareUuid}`,
-        },
-        () => {
-          // Actualizar la lista de usuarios cuando llegue un nuevo mensaje
-          fetchUsers();
-        }
-      )
-      .subscribe();
-
+    
+    // Configurar polling para actualizar usuarios cada 30 segundos
+    const interval = setInterval(fetchUsers, 30000);
+    
     return () => {
-      supabase.removeChannel(channel);
+      clearInterval(interval);
     };
   }, [shareUuid]);
 
-  return { users, loading };
+  return {
+    users,
+    loading,
+    connectUser,
+    disconnectUser,
+    refetch: fetchUsers
+  };
 };

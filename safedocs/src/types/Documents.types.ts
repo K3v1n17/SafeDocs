@@ -7,4 +7,5 @@ export interface UploadMetadata {
 
 export interface UploadDocumentDialogProps {
   trigger?: React.ReactNode;
+  onUploadComplete?: () => void;
 }

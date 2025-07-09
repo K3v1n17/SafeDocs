@@ -1,8 +1,6 @@
 "use client"
 
-import { useEffect } from "react"
 import { useAuth } from "@/contexts/AuthContext"
-import { useRouter } from "next/navigation"
 import { DashboardTitle } from "@/components/Sliderbar/DashboardTitle"
 import { useOverviewStats } from "../../../hooks/useOverviewStats"
 import { StatsCards } from "../../../components/overview/StatsCards"
@@ -12,17 +10,14 @@ import { RecentActivityCard } from "../../../components/overview/RecentActivityC
 import Loading from "@/components/ui/Loading"
 
 export default function DashboardPage() {
-  const { user, loading } = useAuth()
-  const router = useRouter()
+  const { user } = useAuth()
   const { stats, isLoading } = useOverviewStats(user)
 
-  useEffect(() => {
-    if (!loading && !user) {
-      router.push("/")
-    }
-  }, [user, loading, router])
-
-  if (loading || !user || isLoading) return  <Loading title="Overview" />
+  // El AuthGuard del layout se encarga de la protección de rutas
+  // Aquí solo manejamos el loading de los datos
+  if (isLoading) {
+    return <Loading title="Cargando dashboard..." showDashboardTitle={true} />
+  }
 
   return (
     <>

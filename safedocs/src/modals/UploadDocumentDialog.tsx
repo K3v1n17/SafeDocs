@@ -12,7 +12,7 @@ import { UploadProgressIndicator } from "./upload/components/UploadProgressIndic
 import { SecurityNotice } from "./upload/components/SecurityNotice"
 import { UploadDocumentDialogProps } from "../types/Documents.types"
 
-export function UploadDocumentDialog({ trigger }: UploadDocumentDialogProps = {}) {
+export function UploadDocumentDialog({ trigger, onUploadComplete }: UploadDocumentDialogProps = {}) {
   const [open, setOpen] = useState(false)
   
   const {
@@ -34,7 +34,11 @@ export function UploadDocumentDialog({ trigger }: UploadDocumentDialogProps = {}
 
   const onUploadClick = async () => {
     const success = await handleUpload()
-    if (success) setOpen(false)
+    if (success) {
+      setOpen(false)
+      // Refrescar los datos en el componente padre
+      onUploadComplete?.()
+    }
   }
 
   return (
