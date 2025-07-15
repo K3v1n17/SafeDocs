@@ -1,4 +1,4 @@
-// 🔐 Servicio de autenticación escalable con gestión segura de tokens
+// 🔐 Servicio de autenticación con HttpOnly Cookies + Supabase
 import { API_CONFIG } from '@/config/api'
 import { apiClient } from '@/lib/api-client'
 
@@ -10,6 +10,65 @@ export interface AuthUser {
   role?: string
   created_at: string
   updated_at: string
+}
+
+/**
+ * 🔒 Gestor de tokens seguro usando HttpOnly Cookies (integrado)
+ */
+class CookieSecureTokenManager {
+  private static readonly USER_KEY = 'safedocs_user_info';
+  private static readonly SESSION_ACTIVE_KEY = 'safedocs_session_active';
+
+  static setUserSession(user: AuthUser): void {
+    if (typeof window === 'undefined') return;
+
+    try {
+      const safeUserData = {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        username: user.username,
+        role: user.role
+      };
+      
+      sessionStorage.setItem(this.USER_KEY, JSON.stringify(safeUserData));
+      sessionStorage.setItem(this.SESSION_ACTIVE_KEY, 'true');
+      
+      console.log('🔐 Sesión de usuario guardada (sin tokens)');
+    } catch (error) {
+      console.error('Error storing user session:', error);
+    }
+  }
+
+  static hasActiveSession(): boolean {
+    if (typeof window === 'undefined') return false;
+    
+    const sessionActive = sessionStorage.getItem(this.SESSION_ACTIVE_KEY);
+    const userData = sessionStorage.getItem(this.USER_KEY);
+    
+    return !!(sessionActive === 'true' && userData);
+  }
+
+  static clearSession(): void {
+    if (typeof window === 'undefined') return;
+
+    sessionStorage.removeItem(this.USER_KEY);
+    sessionStorage.removeItem(this.SESSION_ACTIVE_KEY);
+    
+    console.log('🔐 Sesión local limpiada');
+  }
+
+  static getUser(): AuthUser | null {
+    if (typeof window === 'undefined') return null;
+    
+    try {
+      const userData = sessionStorage.getItem(this.USER_KEY);
+      return userData ? JSON.parse(userData) : null;
+    } catch (error) {
+      console.error('Error getting user data:', error);
+      return null;
+    }
+  }
 }
 
 export interface LoginData {
@@ -24,9 +83,10 @@ export interface RegisterData {
   name: string
 }
 
+// Ya no necesitamos AuthSession porque los tokens van en cookies HttpOnly
 export interface AuthSession {
-  access_token: string
-  refresh_token: string
+  access_token?: string  // Solo para compatibilidad con código existente
+  refresh_token?: string
   expires_at?: number
 }
 
@@ -34,10 +94,10 @@ export interface AuthResponse {
   success?: boolean
   data?: {
     user: AuthUser | null
-    session: AuthSession | null
+    // session ya no viene en la respuesta porque va en cookies
   }
-  user?: AuthUser | null  // Compatibilidad con formato anterior
-  session?: AuthSession | null  // Compatibilidad con formato anterior
+  user?: AuthUser | null
+  session?: AuthSession | null  // Para compatibilidad, pero estará vacío
   error?: string
   requiresEmailConfirmation?: boolean
 }
@@ -50,151 +110,43 @@ export interface IAuthService {
   refreshSession(): Promise<AuthResponse>
   isAuthenticated(): Promise<boolean>
   getStoredUser(): AuthUser | null
+  hasValidTokens(): boolean  // Para compatibilidad con código existente
 }
 
 /**
- * 🔒 Gestor seguro de tokens con encriptación y validación
+ * 🌐 Servicio de autenticación con HttpOnly Cookies + Supabase
+ * Los tokens se manejan automáticamente por el navegador
  */
-class TokenManager {
-  private static readonly STORAGE_PREFIX = 'safedocs_'
-  private static readonly ACCESS_TOKEN_KEY = `${this.STORAGE_PREFIX}access_token`
-  private static readonly REFRESH_TOKEN_KEY = `${this.STORAGE_PREFIX}refresh_token`
-  private static readonly USER_KEY = `${this.STORAGE_PREFIX}user`
-  private static readonly EXPIRES_AT_KEY = `${this.STORAGE_PREFIX}expires_at`
-
-  /**
-   * Almacena tokens y datos de usuario de forma segura
-   */
-  static setSession(session: AuthSession, user: AuthUser): void {
-    if (typeof window === 'undefined') return
-
-    try {
-      localStorage.setItem(this.ACCESS_TOKEN_KEY, session.access_token)
-      localStorage.setItem(this.REFRESH_TOKEN_KEY, session.refresh_token)
-      localStorage.setItem(this.USER_KEY, JSON.stringify(user))
-      
-      if (session.expires_at) {
-        localStorage.setItem(this.EXPIRES_AT_KEY, session.expires_at.toString())
-      }
-    } catch (error) {
-      console.error('Error storing session:', error)
-    }
-  }
-
-  /**
-   * Obtiene el access token almacenado
-   */
-  static getAccessToken(): string | null {
-    if (typeof window === 'undefined') return null
-    return localStorage.getItem(this.ACCESS_TOKEN_KEY)
-  }
-
-  /**
-   * Obtiene el refresh token almacenado
-   */
-  static getRefreshToken(): string | null {
-    if (typeof window === 'undefined') return null
-    return localStorage.getItem(this.REFRESH_TOKEN_KEY)
-  }
-
-  /**
-   * Obtiene los datos del usuario almacenados
-   */
-  static getUser(): AuthUser | null {
-    if (typeof window === 'undefined') return null
-    
-    try {
-      const userStr = localStorage.getItem(this.USER_KEY)
-      return userStr ? JSON.parse(userStr) : null
-    } catch (error) {
-      console.error('Error parsing stored user:', error)
-      return null
-    }
-  }
-
-  /**
-   * Verifica si el token ha expirado
-   */
-  static isTokenExpired(): boolean {
-    if (typeof window === 'undefined') return true
-    
-    const expiresAt = localStorage.getItem(this.EXPIRES_AT_KEY)
-    if (!expiresAt) return false
-    
-    return Date.now() >= parseInt(expiresAt)
-  }
-
-  /**
-   * Verifica si hay tokens válidos almacenados
-   */
-  static hasValidTokens(): boolean {
-    const accessToken = this.getAccessToken()
-    const refreshToken = this.getRefreshToken()
-    return !!(accessToken && refreshToken && !this.isTokenExpired())
-  }
-
-  /**
-   * Limpia todos los datos de sesión
-   */
-  static clearSession(): void {
-    if (typeof window === 'undefined') return
-
-    localStorage.removeItem(this.ACCESS_TOKEN_KEY)
-    localStorage.removeItem(this.REFRESH_TOKEN_KEY)
-    localStorage.removeItem(this.USER_KEY)
-    localStorage.removeItem(this.EXPIRES_AT_KEY)
-  }
-
-  /**
-   * Actualiza solo los tokens manteniendo los datos de usuario
-   */
-  static updateTokens(session: AuthSession): void {
-    if (typeof window === 'undefined') return
-
-    localStorage.setItem(this.ACCESS_TOKEN_KEY, session.access_token)
-    localStorage.setItem(this.REFRESH_TOKEN_KEY, session.refresh_token)
-    
-    if (session.expires_at) {
-      localStorage.setItem(this.EXPIRES_AT_KEY, session.expires_at.toString())
-    }
-  }
-}
-
-/**
- * 🌐 Servicio de autenticación que usa solo el backend NestJS
- */
-class BackendAuthService implements IAuthService {
+class CookieAuthService implements IAuthService {
   
   async login(data: LoginData): Promise<AuthResponse> {
     try {
-      console.log('🔐 AuthService - Enviando login al backend:', data);
+      console.log('🔐 AuthService - Enviando login al backend (cookies):', data);
+      
+      // El backend configurará las cookies automáticamente
       const response = await apiClient.post('/auth/login', data)
-      console.log('🔐 AuthService - Respuesta del backend:', response);
+      console.log('🔐 AuthService - Respuesta completa del backend:', response);
       
       if (response.success && response.data) {
-        // El backend devuelve { success: true, data: { user, session } }
-        // Pero apiClient lo envuelve en { success: true, data: respuestaCompleta }
-        const backendResponse = response.data;
-        console.log('🔐 AuthService - Respuesta del backend sin envolver:', backendResponse);
+        const { user } = response.data;
+        console.log('🔐 AuthService - Usuario extraído:', user);
         
-        if (backendResponse.success && backendResponse.data) {
-          const { user, session } = backendResponse.data;
-          console.log('🔐 AuthService - Usuario extraído:', user);
-          console.log('🔐 AuthService - Sesión extraída:', session);
+        if (user) {
+          // 🍪 Solo guardar datos del usuario (tokens van en cookies HttpOnly)
+          CookieSecureTokenManager.setUserSession(user);
           
-          if (session) {
-            // Usuario logueado exitosamente
-            TokenManager.setSession(session, user)
-            const result = { user, session };
-            console.log('🔐 AuthService - Resultado final:', result);
-            return result;
-          } else {
-            // Usuario registrado pero necesita confirmar email
-            return { 
-              user, 
-              session: null, 
-              requiresEmailConfirmation: true 
-            }
+          const result = { 
+            user, 
+            session: {} as AuthSession  // Sesión vacía por compatibilidad
+          };
+          console.log('🔐 AuthService - Resultado final:', result);
+          return result;
+        } else {
+          // Usuario registrado pero necesita confirmar email
+          return { 
+            user, 
+            session: null, 
+            requiresEmailConfirmation: true 
           }
         }
       }
@@ -216,27 +168,27 @@ class BackendAuthService implements IAuthService {
 
   async register(data: RegisterData): Promise<AuthResponse> {
     try {
+      // El backend configurará las cookies automáticamente si hay auto-login
       const response = await apiClient.post('/auth/register', data)
+      console.log('🔐 AuthService - Respuesta de registro:', response);
       
       if (response.success && response.data) {
-        // El backend devuelve { success: true, data: { user, session } }
-        // Pero apiClient lo envuelve en { success: true, data: respuestaCompleta }
-        const backendResponse = response.data;
+        const { user } = response.data;
         
-        if (backendResponse.success && backendResponse.data) {
-          const { user, session } = backendResponse.data;
+        if (user) {
+          // 🍪 Guardar datos del usuario (tokens van en cookies)
+          CookieSecureTokenManager.setUserSession(user);
           
-          if (session) {
-            // Usuario registrado y logueado automáticamente
-            TokenManager.setSession(session, user)
-            return { user, session }
-          } else {
-            // Usuario registrado pero necesita confirmar email
-            return { 
-              user, 
-              session: null, 
-              requiresEmailConfirmation: true 
-            }
+          return { 
+            user, 
+            session: {} as AuthSession  // Sesión vacía por compatibilidad
+          }
+        } else {
+          // Usuario registrado pero necesita confirmar email
+          return { 
+            user, 
+            session: null, 
+            requiresEmailConfirmation: true 
           }
         }
       }
@@ -258,100 +210,69 @@ class BackendAuthService implements IAuthService {
 
   async logout(): Promise<void> {
     try {
-      const token = TokenManager.getAccessToken()
-      
-      if (token) {
-        // Invalidar token en el backend
-        await fetch(`${API_CONFIG.backend.baseUrl}/auth/logout`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        })
-      }
+      // El backend limpiará las cookies HttpOnly automáticamente
+      await apiClient.post('/auth/logout')
     } catch (error) {
       console.error('Logout error:', error)
     } finally {
       // Siempre limpiar el storage local
-      TokenManager.clearSession()
+      CookieSecureTokenManager.clearSession()
     }
   }
 
   async getCurrentUser(): Promise<AuthUser | null> {
     try {
-      const token = TokenManager.getAccessToken()
-      if (!token) {
-        console.log('🔐 getCurrentUser - No hay token');
-        return null;
-      }
-
-      // Si el token está expirado, intentar renovarlo
-      if (TokenManager.isTokenExpired()) {
-        console.log('🔐 getCurrentUser - Token expirado, intentando renovar');
-        const refreshResult = await this.refreshSession()
-        if (!refreshResult.session) {
-          console.log('🔐 getCurrentUser - No se pudo renovar el token');
-          TokenManager.clearSession()
-          return null
-        }
-      }
-
       console.log('🔐 getCurrentUser - Obteniendo usuario del backend');
+      
+      // Las cookies se envían automáticamente con la request
       const response = await apiClient.get('/auth/me')
+      console.log('🔐 getCurrentUser - Respuesta:', response);
       
       if (response.success && response.data) {
-        console.log('🔐 getCurrentUser - Usuario obtenido:', response.data.user);
-        return response.data.user
+        const user = response.data;
+        console.log('🔐 getCurrentUser - Usuario obtenido:', user);
+        
+        // Actualizar datos locales del usuario
+        CookieSecureTokenManager.setUserSession(user);
+        
+        return user
       }
       
       console.log('🔐 getCurrentUser - Respuesta inválida del backend');
       return null
     } catch (error) {
       console.error('🔐 getCurrentUser - Error:', error)
-      // Si hay error de autenticación, limpiar tokens
-      TokenManager.clearSession()
+      // Si hay error de autenticación, limpiar sesión local
+      CookieSecureTokenManager.clearSession()
       return null
     }
   }
 
   async refreshSession(): Promise<AuthResponse> {
     try {
-      const refreshToken = TokenManager.getRefreshToken()
-      if (!refreshToken) {
-        return { 
-          user: null, 
-          session: null, 
-          error: 'No hay refresh token' 
-        }
-      }
-
-      const response = await fetch(`${API_CONFIG.backend.baseUrl}/auth/refresh`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ refresh_token: refreshToken }),
-      })
-
-      const result = await response.json()
+      // El backend maneja el refresh usando cookies automáticamente
+      const response = await apiClient.post('/auth/refresh')
       
-      if (result.success && result.data) {
-        const { user, session } = result.data
+      if (response.success && response.data) {
+        const user = response.data;
         
-        // Actualizar tokens
-        TokenManager.setSession(session, user)
+        // Actualizar datos del usuario
+        CookieSecureTokenManager.setUserSession(user)
         
-        return { user, session }
+        return { 
+          user, 
+          session: {} as AuthSession  // Sesión vacía por compatibilidad
+        }
       }
       
       return { 
         user: null, 
         session: null, 
-        error: result.error || 'Error renovando sesión' 
+        error: response.error || 'Error renovando sesión' 
       }
     } catch (error) {
       console.error('Token refresh error:', error)
+      CookieSecureTokenManager.clearSession()
       return { 
         user: null, 
         session: null, 
@@ -361,11 +282,6 @@ class BackendAuthService implements IAuthService {
   }
 
   async isAuthenticated(): Promise<boolean> {
-    // Verificar si hay tokens válidos
-    if (!TokenManager.hasValidTokens()) {
-      return false
-    }
-
     try {
       const user = await this.getCurrentUser()
       return !!user
@@ -375,16 +291,19 @@ class BackendAuthService implements IAuthService {
   }
 
   getStoredUser(): AuthUser | null {
-    return TokenManager.getUser()
+    return CookieSecureTokenManager.getUser()
   }
 
+  // Para compatibilidad con código existente
   hasValidTokens(): boolean {
-    return TokenManager.hasValidTokens()
+    // Con cookies HttpOnly, verificamos si hay sesión activa localmente
+    // La validación real se hace en getCurrentUser()
+    return CookieSecureTokenManager.hasActiveSession()
   }
 }
 
 /**
  * 🔐 Instancia singleton del servicio de autenticación
- * Solo usa el backend NestJS para mayor seguridad
+ * Usa HttpOnly Cookies para máxima seguridad
  */
-export const authService = new BackendAuthService()
+export const authService = new CookieAuthService()

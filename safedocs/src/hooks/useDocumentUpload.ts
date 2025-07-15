@@ -67,12 +67,10 @@ export function useDocumentUpload() {
           })
         }
 
-        // Subir archivo y crear documento a través del backend
+        // Subir archivo y crear documento a través del backend con cookies HttpOnly
         const response = await fetch(`${API_CONFIG.backend.baseUrl}${API_CONFIG.backend.endpoints.documents}/upload`, {
           method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('safedocs_access_token')}`,
-          },
+          credentials: 'include', // 🔑 CLAVE: Envía cookies HttpOnly automáticamente
           body: formData
         })
 

@@ -36,47 +36,54 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   /* 1️⃣  Cargar sesión al montar */
   useEffect(() => {
     const loadSession = async () => {
-      console.log('🔐 Cargando sesión inicial...');
-      try {
-        // Verificar si hay tokens válidos almacenados
-        if (!authService.hasValidTokens()) {
-          console.log('🔐 No hay tokens válidos, usuario no autenticado');
-          setUser(null);
-          setSession(null);
-          return;
+      console.log('🔐 Cargando sesión inicial (con cookies)...');
+      
+      // 🧹 SEGURIDAD: Limpiar cualquier token inseguro antes de cargar la sesión
+      if (typeof window !== 'undefined') {
+        const insecureKeys = [
+          'access_token', 'refresh_token', 'expires_at', 'expires_in', 'token_type', 'user',
+          'safedocs_access_token', 'safedocs_refresh_token', 'safedocs_expires_at',
+          'sb-access-token', 'sb-refresh-token', 'supabase.auth.token'
+        ];
+        
+        let foundInsecureTokens = false;
+        insecureKeys.forEach(key => {
+          if (localStorage.getItem(key)) {
+            console.warn(`🚨 SEGURIDAD: Eliminando token inseguro "${key}" de localStorage`);
+            localStorage.removeItem(key);
+            foundInsecureTokens = true;
+          }
+        });
+        
+        if (foundInsecureTokens) {
+          console.log('🔒 Tokens inseguros eliminados, usando solo cookies HttpOnly seguras');
         }
-
-        // Intentar obtener el usuario actual del backend
+      }
+      
+      try {
         const currentUser = await authService.getCurrentUser();
         console.log('🔐 Usuario actual del backend:', currentUser);
         
         if (currentUser) {
           setUser(currentUser);
           
-          // Obtener tokens almacenados para crear la sesión
-          const token = localStorage.getItem('safedocs_access_token');
-          const refreshToken = localStorage.getItem('safedocs_refresh_token');
-          const expiresAt = localStorage.getItem('safedocs_expires_at');
-          
-          if (token && refreshToken) {
-            const session = {
-              access_token: token,
-              refresh_token: refreshToken,
-              expires_at: expiresAt ? parseInt(expiresAt) : undefined
-            };
-            console.log('🔐 Sesión restaurada:', session);
-            setSession(session);
-          }
+          // Con cookies HttpOnly, la "sesión" es solo indicativa
+          const fakeSession = {
+            access_token: 'managed_by_cookies',
+            refresh_token: 'managed_by_cookies',
+            expires_at: undefined
+          };
+          console.log('🔐 Sesión activa (cookies HttpOnly)');
+          setSession(fakeSession);
         } else {
-          // Si no se puede obtener el usuario, limpiar los tokens
-          console.log('🔐 No se pudo obtener el usuario del backend, limpiando tokens');
-          authService.logout();
+          // Si no se puede obtener el usuario, la sesión no es válida
+          console.log('🔐 No hay sesión válida');
           setUser(null);
           setSession(null);
         }
       } catch (error) {
         console.error('Error loading session:', error);
-        // En caso de error, limpiar la sesión
+        // En caso de error, limpiar la sesión local
         authService.logout();
         setUser(null);
         setSession(null);
@@ -99,7 +106,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const signInWithEmail = async (email: string, password: string) => {
     try {
       setLoading(true);
-      console.log('🔐 AuthContext - Iniciando login...');
+      console.log('🔐 AuthContext - Iniciando login (cookies)...');
       
       const response: AuthResponse = await authService.login({ email, password });
       console.log('🔐 AuthContext - Respuesta del authService:', response);
@@ -113,17 +120,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const session = response.session;
       
       console.log('🔐 AuthContext - Usuario extraído:', user);
-      console.log('🔐 AuthContext - Sesión extraída:', session);
+      console.log('🔐 AuthContext - Sesión extraída (cookies):', session);
       
-      if (user && session) {
+      if (user) {
         setUser(user);
-        setSession(session);
+        
+        // Con cookies HttpOnly, la sesión es solo indicativa
+        const fakeSession = {
+          access_token: 'managed_by_cookies',
+          refresh_token: 'managed_by_cookies',
+          expires_at: undefined
+        };
+        setSession(fakeSession);
         console.log('🔐 AuthContext - Estados actualizados correctamente');
         
-        // No hacer redirección aquí, que se encargue el componente que llama
         return { user };
       } else {
-        console.error('🔐 AuthContext - No se pudo extraer usuario o sesión');
+        console.error('🔐 AuthContext - No se pudo extraer usuario');
         throw new Error('Error en la autenticación: datos incompletos');
       }
     } catch (error: any) {
@@ -154,13 +167,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       // Los datos ya están en la estructura correcta desde authService
       const user = response.user;
-      const session = response.session;
       
       if (user) {
-        if (session) {
-          setUser(user);
-          setSession(session);
-        }
+        setUser(user);
+        
+        // Con cookies HttpOnly, la sesión se maneja automáticamente
+        const fakeSession = {
+          access_token: 'managed_by_cookies',
+          refresh_token: 'managed_by_cookies',
+          expires_at: undefined
+        };
+        setSession(fakeSession);
       }
       
       return { user: user || null };

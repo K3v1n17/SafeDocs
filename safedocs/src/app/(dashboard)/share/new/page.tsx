@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/lib/supabase';
+// import { supabase } from '@/lib/supabase'; // ❌ DESHABILITADO: Inseguro, usa localStorage
 import { DashboardTitle } from '@/components/Sliderbar/DashboardTitle';
 import {
   Card,
@@ -36,35 +36,40 @@ export default function NewSharePage() {
     setLoading(true);
     setError(null);
 
-    try {      // Crear un nuevo chat grupal
-      const { data: shareData, error: shareError } = await supabase
-        .from('document_shares')
-        .insert({
-          document_id: null, // Permitir null para chat grupal general
-          created_by: user.id,
-          title: formData.title || 'Chat Grupal',
-          message: formData.message || 'Bienvenidos al chat grupal',
-          is_active: true,
-        })
-        .select('id, share_token')
-        .single();
+    try {
+      // TODO: Migrar a backend seguro usando apiClient
+      setError('Esta funcionalidad se migrará a cookies HttpOnly seguras. Por ahora está deshabilitada.');
+      return;
+      
+      // // Crear un nuevo chat grupal
+      // const { data: shareData, error: shareError } = await supabase
+      //   .from('document_shares')
+      //   .insert({
+      //     document_id: null, // Permitir null para chat grupal general
+      //     created_by: user.id,
+      //     title: formData.title || 'Chat Grupal',
+      //     message: formData.message || 'Bienvenidos al chat grupal',
+      //     is_active: true,
+      //   })
+      //   .select('id, share_token')
+      //   .single();
 
-      if (shareError) {
-        console.error('Error creando el chat:', shareError);
-        setError('Error al crear el chat grupal. Intenta de nuevo.');
-        return;
-      }
+      // if (shareError) {
+      //   console.error('Error creando el chat:', shareError);
+      //   setError('Error al crear el chat grupal. Intenta de nuevo.');
+      //   return;
+      // }
 
-      // Insertar mensaje de bienvenida del sistema
-      await supabase.from('document_share_messages').insert({
-        share_id: shareData.id, // Usar el ID del share
-        sender_id: null,
-        content: `${user.email || 'Un usuario'} ha creado el chat grupal: ${formData.title || 'Chat Grupal'}`,
-        msg_type: 'system',
-      });
+      // // Insertar mensaje de bienvenida del sistema
+      // await supabase.from('document_share_messages').insert({
+      //   share_id: shareData.id, // Usar el ID del share
+      //   sender_id: null,
+      //   content: `${user.email || 'Un usuario'} ha creado el chat grupal: ${formData.title || 'Chat Grupal'}`,
+      //   msg_type: 'system',
+      // });
 
-      // Redirigir al chat creado
-      router.push(`/share/${shareData.share_token}`);
+      // // Redirigir al chat creado
+      // router.push(`/share/${shareData.share_token}`);
     } catch (err) {
       console.error('Error:', err);
       setError('Error inesperado. Intenta de nuevo.');

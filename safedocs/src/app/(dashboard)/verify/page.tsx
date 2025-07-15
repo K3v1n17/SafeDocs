@@ -5,12 +5,12 @@ import { useAuth } from "@/contexts/AuthContext"
 import { useRouter } from "next/navigation"
 import { DashboardTitle } from "@/components/Sliderbar/DashboardTitle"
 import Loading from "@/components/ui/Loading"
-import { useVerification } from "../../../hooks/useVerification"
-import { VerificationControls } from "../../../components/verify/VerificationControls"
-import { VerificationResultsSummary } from "../../../components/verify/VerificationResultsSummary"
-import { VerificationResultCard } from "../../../components/verify/VerificationResultCard"
-import { EmptyDocumentsCard } from "../../../components/verify/EmptyDocumentsCard"
-import { SecurityNotice } from "../../../components/verify/SecurityNotice"
+import { useVerification } from "@/hooks/useVerification"
+import { VerificationControls } from "@/components/verify/VerificationControls"
+import { VerificationResultsSummary } from "@/components/verify/VerificationResultsSummary"
+import { VerificationResultCard } from "@/components/verify/VerificationResultCard"
+import { EmptyDocumentsCard } from "@/components/verify/EmptyDocumentsCard"
+import { SecurityNotice } from "@/components/verify/SecurityNotice"
 
 export default function VerifyPage() {
   const { user, loading } = useAuth()

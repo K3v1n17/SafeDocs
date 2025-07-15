@@ -59,7 +59,7 @@ export interface IDocumentService {
 }
 
 class DocumentService implements IDocumentService {
-  private readonly baseURL = buildApiUrl(API_CONFIG.backend.endpoints.documents)
+  private readonly baseEndpoint = API_CONFIG.backend.endpoints.documents // Solo el endpoint relativo
 
   /**
    * 📋 Obtener lista de documentos con filtros y paginación
@@ -82,23 +82,47 @@ class DocumentService implements IDocumentService {
         }
       }
 
-      const response = await apiClient.get(`${this.baseURL}?${params}`)
+      console.log(`🔐 DocumentService - Obteniendo documentos: ${this.baseEndpoint}?${params}`)
+      const response = await apiClient.get(`${this.baseEndpoint}?${params}`)
       
-      // Tu backend devuelve directamente un array de documentos
-      if (response.success && Array.isArray(response.data)) {
-        return {
-          success: true,
-          data: {
-            documents: response.data,
-            total: response.data.length,
-            page,
-            limit
+      console.log('🔐 DocumentService - Respuesta completa:', response)
+      console.log('🔐 DocumentService - response.success:', response.success)
+      console.log('🔐 DocumentService - response.data:', response.data)
+      console.log('🔐 DocumentService - Array.isArray(response.data):', Array.isArray(response.data))
+      
+      // El backend NestJS devuelve directamente un array en response.data
+      if (response.success && response.data) {
+        // Si response.data es un array, usarlo directamente
+        if (Array.isArray(response.data)) {
+          console.log('✅ DocumentService - Array de documentos recibido:', response.data.length)
+          return {
+            success: true,
+            data: {
+              documents: response.data,
+              total: response.data.length,
+              page,
+              limit
+            }
+          }
+        }
+        // Si response.data es un objeto con documentos, extraerlos
+        else if (response.data.documents && Array.isArray(response.data.documents)) {
+          console.log('✅ DocumentService - Documentos en objeto:', response.data.documents.length)
+          return {
+            success: true,
+            data: {
+              documents: response.data.documents,
+              total: response.data.total || response.data.documents.length,
+              page: response.data.page || page,
+              limit: response.data.limit || limit
+            }
           }
         }
       }
       
-      // Si no es un array, asumir que es el formato esperado
-      return response.data || {
+      // Si no hay datos o el formato es inesperado
+      console.warn('🔐 DocumentService - Formato de respuesta inesperado:', response)
+      return {
         success: false,
         data: {
           documents: [],
@@ -106,7 +130,7 @@ class DocumentService implements IDocumentService {
           page,
           limit
         },
-        error: 'Formato de respuesta inesperado'
+        error: 'No se encontraron documentos o formato de respuesta inesperado'
       }
     } catch (error: any) {
       console.error('Error fetching documents:', error)
@@ -128,11 +152,27 @@ class DocumentService implements IDocumentService {
    */
   async getDocument(id: string): Promise<DocumentResponse> {
     try {
-      const response = await apiClient.get(`${this.baseURL}/${id}`)
-      return response.data
+      const response = await apiClient.get(`${this.baseEndpoint}/${id}`)
+      
+      if (response.success && response.data) {
+        return {
+          success: true,
+          data: response.data
+        }
+      }
+      
+      return {
+        success: false,
+        data: null as any,
+        error: response.error || 'Error al obtener documento'
+      }
     } catch (error: any) {
       console.error('Error fetching document:', error)
-      throw new Error(error.response?.data?.message || 'Error al obtener documento')
+      return {
+        success: false,
+        data: null as any,
+        error: error.message || 'Error al obtener documento'
+      }
     }
   }
 
@@ -150,7 +190,7 @@ class DocumentService implements IDocumentService {
       }
 
       // Usar método personalizado para FormData
-      const response = await this.uploadFormData(`${this.baseURL}/upload`, formData)
+      const response = await this.uploadFormData(`${this.baseEndpoint}/upload`, formData)
       return response
     } catch (error: any) {
       console.error('Error uploading document:', error)
@@ -159,17 +199,20 @@ class DocumentService implements IDocumentService {
   }
 
   /**
-   * 📤 Método auxiliar para subir FormData
+   * 📤 Método auxiliar para subir FormData con cookies HttpOnly
    */
   private async uploadFormData(endpoint: string, formData: FormData): Promise<DocumentUploadResponse> {
-    const token = typeof window !== 'undefined' ? localStorage.getItem('safedocs_access_token') : null
+    console.log('🔐 DocumentService - Subiendo archivo con cookies HttpOnly')
     
-    const response = await fetch(endpoint, {
+    // Construir URL completa
+    const fullUrl = `${API_CONFIG.backend.baseUrl}${endpoint}`
+    console.log('🔐 DocumentService - URL de upload:', fullUrl)
+    
+    const response = await fetch(fullUrl, {
       method: 'POST',
       body: formData,
-      headers: {
-        ...(token && { Authorization: `Bearer ${token}` })
-      }
+      credentials: 'include', // 🔑 CLAVE: Envía cookies HttpOnly automáticamente
+      // NO incluir Content-Type para FormData, el navegador lo configura automáticamente
     })
 
     const result = await response.json()
@@ -192,14 +235,27 @@ class DocumentService implements IDocumentService {
    */
   async updateDocument(id: string, data: Partial<Document>): Promise<DocumentResponse> {
     try {
-      const response = await apiClient.patch(`${this.baseURL}/${id}`, data)
+      const response = await apiClient.patch(`${this.baseEndpoint}/${id}`, data)
+      
+      if (response.success && response.data) {
+        return {
+          success: true,
+          data: response.data
+        }
+      }
+      
       return {
-        success: true,
-        data: response.data
+        success: false,
+        data: null as any,
+        error: response.error || 'Error al actualizar documento'
       }
     } catch (error: any) {
       console.error('Error updating document:', error)
-      throw new Error(error.response?.data?.message || 'Error al actualizar documento')
+      return {
+        success: false,
+        data: null as any,
+        error: error.message || 'Error al actualizar documento'
+      }
     }
   }
 
@@ -208,31 +264,37 @@ class DocumentService implements IDocumentService {
    */
   async deleteDocument(id: string): Promise<{ success: boolean; error?: string }> {
     try {
-      const response = await apiClient.delete(`${this.baseURL}/${id}`)
+      const response = await apiClient.delete(`${this.baseEndpoint}/${id}`)
+      
+      if (response.success) {
+        return {
+          success: true
+        }
+      }
+      
       return {
-        success: true
+        success: false,
+        error: response.error || 'Error al eliminar documento'
       }
     } catch (error: any) {
       console.error('Error deleting document:', error)
       return {
         success: false,
-        error: error.response?.data?.message || 'Error al eliminar documento'
+        error: error.message || 'Error al eliminar documento'
       }
     }
   }
 
   /**
-   * 📥 Descargar documento
+   * 📥 Descargar documento con cookies HttpOnly
    */
   async downloadDocument(id: string): Promise<Blob> {
     try {
-      const token = typeof window !== 'undefined' ? localStorage.getItem('safedocs_access_token') : null
+      console.log('🔐 DocumentService - Descargando documento con cookies HttpOnly')
       
-      const response = await fetch(`${this.baseURL}/${id}/download`, {
+      const response = await fetch(`${API_CONFIG.backend.baseUrl}${this.baseEndpoint}/${id}/download`, {
         method: 'GET',
-        headers: {
-          ...(token && { Authorization: `Bearer ${token}` })
-        }
+        credentials: 'include', // 🔑 CLAVE: Envía cookies HttpOnly automáticamente
       })
 
       if (!response.ok) {
@@ -251,11 +313,27 @@ class DocumentService implements IDocumentService {
    */
   async shareDocument(id: string, isPublic: boolean): Promise<DocumentResponse> {
     try {
-      const response = await apiClient.patch(`${this.baseURL}/${id}/share`, { isPublic })
-      return response.data
+      const response = await apiClient.patch(`${this.baseEndpoint}/${id}/share`, { isPublic })
+      
+      if (response.success && response.data) {
+        return {
+          success: true,
+          data: response.data
+        }
+      }
+      
+      return {
+        success: false,
+        data: null as any,
+        error: response.error || 'Error al compartir documento'
+      }
     } catch (error: any) {
       console.error('Error sharing document:', error)
-      throw new Error(error.response?.data?.message || 'Error al compartir documento')
+      return {
+        success: false,
+        data: null as any,
+        error: error.message || 'Error al compartir documento'
+      }
     }
   }
 
@@ -277,11 +355,51 @@ class DocumentService implements IDocumentService {
         if (filters.tags?.length) params.append('tags', filters.tags.join(','))
       }
 
-      const response = await apiClient.get(`${this.baseURL}/search?${params}`)
-      return response.data
+      const response = await apiClient.get(`${this.baseEndpoint}/search?${params}`)
+      
+      // Manejar la respuesta igual que en getDocuments
+      if (response.success && response.data) {
+        if (Array.isArray(response.data)) {
+          return {
+            success: true,
+            data: {
+              documents: response.data,
+              total: response.data.length,
+              page: 1,
+              limit: 20
+            }
+          }
+        }
+        else if (response.data.documents && Array.isArray(response.data.documents)) {
+          return {
+            success: true,
+            data: response.data
+          }
+        }
+      }
+      
+      return {
+        success: false,
+        data: {
+          documents: [],
+          total: 0,
+          page: 1,
+          limit: 20
+        },
+        error: response.error || 'Error al buscar documentos'
+      }
     } catch (error: any) {
       console.error('Error searching documents:', error)
-      throw new Error(error.response?.data?.message || 'Error al buscar documentos')
+      return {
+        success: false,
+        data: {
+          documents: [],
+          total: 0,
+          page: 1,
+          limit: 20
+        },
+        error: error.message || 'Error al buscar documentos'
+      }
     }
   }
 }
