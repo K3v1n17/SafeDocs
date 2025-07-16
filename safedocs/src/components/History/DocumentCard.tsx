@@ -3,7 +3,7 @@
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { File, Calendar, Tag, Edit, Trash2 } from "lucide-react"
+import { File, Calendar, Tag, Edit, Trash2, Share2, Users } from "lucide-react"
 import { DocumentEditForm } from "./DocumentEditForm"
 
 interface Document {
@@ -36,6 +36,8 @@ interface DocumentCardProps {
   onSaveEdit: () => void
   onCancelEdit: () => void
   onDelete: () => void
+  onShare: () => void
+  onManageShares?: () => void
   setEditingData: (data: EditingDocument) => void
   formatFileSize: (bytes: number) => string
   getMimeTypeIcon: (mimeType: string) => string
@@ -52,6 +54,8 @@ export function DocumentCard({
   onSaveEdit,
   onCancelEdit,
   onDelete,
+  onShare,
+  onManageShares,
   setEditingData,
   formatFileSize,
   getMimeTypeIcon,
@@ -176,6 +180,16 @@ export function DocumentCard({
                     <Edit className="h-4 w-4 mr-2" />
                     Editar
                   </Button>
+                  <Button size="sm" variant="outline" onClick={onShare}>
+                    <Share2 className="h-4 w-4 mr-2" />
+                    Compartir
+                  </Button>
+                  {onManageShares && (
+                    <Button size="sm" variant="outline" onClick={onManageShares}>
+                      <Users className="h-4 w-4 mr-2" />
+                      Gestionar
+                    </Button>
+                  )}
                   <Button size="sm" variant="destructive" onClick={onDelete}>
                     <Trash2 className="h-4 w-4 mr-2" />
                     Eliminar

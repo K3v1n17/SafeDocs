@@ -8,15 +8,20 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { FileText } from "lucide-react"
 import Loading from "@/components/ui/Loading"
 import { UploadDocumentDialog } from "@/modals/UploadDocumentDialog"
+import { toast } from "sonner"
 
 import { useHistoryData } from "@/hooks/useHistoryData"
 import { Document } from "@/services"
+import { documentShareService, SharedWithMe } from "@/services/documentShare.service"
 
 // Componentes
 import { StatsCards } from "@/components/History/StatsCards"
 import { DocumentCard } from "@/components/History/DocumentCard"
 import { DocumentFilters } from "@/components/History/DocumentFilters"
 import { ActivityHistory } from "@/components/History/ActivityHistory"
+import { ShareDocumentDialog } from "@/components/History/ShareDocumentDialog"
+import { SharedDocumentsCard } from "@/components/History/SharedDocumentsCard"
+import { ManageDocumentSharesDialog } from "@/components/History/ManageDocumentSharesDialog"
 
 interface EditingDocument {
   title: string
@@ -39,6 +44,14 @@ export default function HistoryPage() {
     tags: [],
   })
   const [expandedDoc, setExpandedDoc] = useState<string | null>(null)
+  
+  // Estados para compartir documentos
+  const [shareDialogOpen, setShareDialogOpen] = useState(false)
+  const [documentToShare, setDocumentToShare] = useState<Document | null>(null)
+  const [sharedDocuments, setSharedDocuments] = useState<SharedWithMe[]>([])
+  const [loadingShared, setLoadingShared] = useState(false)
+  const [manageSharesOpen, setManageSharesOpen] = useState(false)
+  const [documentToManage, setDocumentToManage] = useState<Document | null>(null)
 
   // Usar el hook personalizado para manejar los datos
   const {
@@ -64,8 +77,23 @@ export default function HistoryPage() {
   useEffect(() => {
     if (!loading && !user) {
       router.push("/")
+    } else if (user) {
+      // Cargar documentos compartidos conmigo
+      loadSharedDocuments()
     }
   }, [user, loading, router])
+
+  const loadSharedDocuments = async () => {
+    setLoadingShared(true)
+    try {
+      const shared = await documentShareService.getSharedWithMe()
+      setSharedDocuments(shared)
+    } catch (error) {
+      console.error("Error loading shared documents:", error)
+    } finally {
+      setLoadingShared(false)
+    }
+  }
 
   const handleDeleteDocument = async (documentId: string, documentTitle: string) => {
     try {
@@ -114,6 +142,39 @@ export default function HistoryPage() {
     setEditingDoc(null)
     setEditingData({ title: "", description: "", doc_type: "", tags: [] })
     setExpandedDoc(null)
+  }
+
+  const handleShareDocument = (doc: Document) => {
+    setDocumentToShare(doc)
+    setShareDialogOpen(true)
+  }
+
+  const handleShareDialogClose = () => {
+    setShareDialogOpen(false)
+    setDocumentToShare(null)
+    // Recargar documentos compartidos por si se compartió algo nuevo
+    loadSharedDocuments()
+  }
+
+  const handleManageShares = (doc: Document) => {
+    setDocumentToManage(doc)
+    setManageSharesOpen(true)
+  }
+
+  const handleViewSharedDocument = async (shareToken: string) => {
+    try {
+      const sharedDoc = await documentShareService.getSharedDocument(shareToken)
+      // Abrir el documento en una nueva ventana
+      if (sharedDoc.document.signed_file_url) {
+        window.open(sharedDoc.document.signed_file_url, '_blank')
+        toast.success("Documento abierto en nueva ventana")
+      } else {
+        toast.error("No se pudo obtener la URL del documento")
+      }
+    } catch (error) {
+      console.error("Error viewing shared document:", error)
+      toast.error("Error al acceder al documento compartido")
+    }
   }
 
   const formatFileSize = (bytes: number) => {
@@ -226,6 +287,8 @@ export default function HistoryPage() {
                   onSaveEdit={() => handleEditDocument(doc.id)}
                   onCancelEdit={cancelEdit}
                   onDelete={() => handleDeleteDocument(doc.id, doc.title)}
+                  onShare={() => handleShareDocument(doc)}
+                  onManageShares={() => handleManageShares(doc)}
                   setEditingData={setEditingData}
                   formatFileSize={formatFileSize}
                   getMimeTypeIcon={getMimeTypeIcon}
@@ -237,6 +300,43 @@ export default function HistoryPage() {
                   <FileText className="mx-auto h-16 w-16 mb-4 opacity-50" />
                   <h3 className="text-lg font-medium mb-2">No tienes documentos subidos</h3>
                   <p className="text-sm">Sube tu primer documento para comenzar</p>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Documentos Compartidos Conmigo */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Documentos Compartidos Conmigo</CardTitle>
+            <CardDescription>
+              {loadingShared 
+                ? "Cargando..." 
+                : `${sharedDocuments.length} documentos compartidos`
+              }
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {loadingShared ? (
+                <div className="text-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+                  <p className="text-sm text-gray-500 mt-2">Cargando documentos compartidos...</p>
+                </div>
+              ) : sharedDocuments.length > 0 ? (
+                sharedDocuments.map((sharedDoc) => (
+                  <SharedDocumentsCard
+                    key={sharedDoc.id}
+                    sharedDocument={sharedDoc}
+                    onViewDocument={handleViewSharedDocument}
+                  />
+                ))
+              ) : (
+                <div className="text-center py-12 text-muted-foreground">
+                  <FileText className="mx-auto h-16 w-16 mb-4 opacity-50" />
+                  <h3 className="text-lg font-medium mb-2">No tienes documentos compartidos</h3>
+                  <p className="text-sm">Los documentos que otros usuarios compartan contigo aparecerán aquí</p>
                 </div>
               )}
             </div>
@@ -256,6 +356,26 @@ export default function HistoryPage() {
         {/* Activity History */}
         {/* <ActivityHistory entries={filteredEntries} documents={documents} totalEntries={historyEntries.length} /> */}
       </div>
+
+      {/* Share Document Dialog */}
+      {documentToShare && (
+        <ShareDocumentDialog
+          open={shareDialogOpen}
+          onOpenChange={handleShareDialogClose}
+          documentId={documentToShare.id}
+          documentTitle={documentToShare.title}
+        />
+      )}
+
+      {/* Manage Document Shares Dialog */}
+      {documentToManage && (
+        <ManageDocumentSharesDialog
+          open={manageSharesOpen}
+          onOpenChange={setManageSharesOpen}
+          documentId={documentToManage.id}
+          documentTitle={documentToManage.title}
+        />
+      )}
     </div>
   )
 }
