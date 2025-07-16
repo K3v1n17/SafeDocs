@@ -129,38 +129,46 @@ export const useAdminData = (): UseAdminDataReturn => {
     try {
       const response = await adminService.deleteUser(userId)
       
-      if (!response.success) {
+      // Manejo más robusto de la respuesta
+      if (response.success === false) {
         throw new Error(response.error || 'Error al eliminar el usuario')
       }
 
+      // Si llegamos aquí, asumimos que la eliminación fue exitosa
       // Eliminar usuario del estado local
       setUsers(prevUsers => prevUsers.filter(u => u.id !== userId))
 
-      // Recalcular estadísticas
-      const updatedUsers = users.filter(u => u.id !== userId)
-      const totalUsers = updatedUsers.length
-      const adminUsers = updatedUsers.filter(u => u.role === 'admin').length
-      const ownerUsers = updatedUsers.filter(u => u.role === 'owner').length
-      const activeUsers = updatedUsers.filter(u => u.email_confirmed).length
-      const inactiveUsers = totalUsers - activeUsers
-      
-      const weekAgo = new Date()
-      weekAgo.setDate(weekAgo.getDate() - 7)
-      const recentlyCreated = updatedUsers.filter(u => {
-        const createdAt = new Date(u.created_at)
-        return createdAt >= weekAgo
-      }).length
-      
-      setStats({
-        totalUsers,
-        adminUsers,
-        ownerUsers,
-        activeUsers,
-        inactiveUsers,
-        recentlyCreated
+      // Recalcular estadísticas con el estado actualizado
+      setUsers(currentUsers => {
+        const updatedUsers = currentUsers.filter(u => u.id !== userId)
+        const totalUsers = updatedUsers.length
+        const adminUsers = updatedUsers.filter(u => u.role === 'admin').length
+        const ownerUsers = updatedUsers.filter(u => u.role === 'owner').length
+        const activeUsers = updatedUsers.filter(u => u.email_confirmed).length
+        const inactiveUsers = totalUsers - activeUsers
+        
+        const weekAgo = new Date()
+        weekAgo.setDate(weekAgo.getDate() - 7)
+        const recentlyCreated = updatedUsers.filter(u => {
+          const createdAt = new Date(u.created_at)
+          return createdAt >= weekAgo
+        }).length
+        
+        setStats({
+          totalUsers,
+          adminUsers,
+          ownerUsers,
+          activeUsers,
+          inactiveUsers,
+          recentlyCreated
+        })
+
+        return updatedUsers
       })
+
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Error desconocido'
+      console.error("Error deleting user:", err)
       throw new Error(`Error al eliminar el usuario: ${errorMessage}`)
     }
   }

@@ -144,12 +144,26 @@ class ApiClient {
       let rawResponse: any
       
       try {
-        rawResponse = await response.json()
+        // Verificar si hay contenido para parsear
+        const responseText = await response.text()
+        
+        if (responseText.trim() === '') {
+          // Respuesta vacía - común en DELETE exitosos
+          rawResponse = { success: true, message: 'Operación exitosa' }
+        } else {
+          rawResponse = JSON.parse(responseText)
+        }
       } catch (parseError) {
         console.error('🚨 ApiClient - Error parsing response JSON:', parseError)
-        return {
-          success: false,
-          error: 'Invalid response format'
+        
+        // Si la respuesta HTTP es exitosa pero no se puede parsear, asumimos éxito
+        if (response.ok) {
+          rawResponse = { success: true, message: 'Operación exitosa' }
+        } else {
+          return {
+            success: false,
+            error: 'Invalid response format'
+          }
         }
       }
 

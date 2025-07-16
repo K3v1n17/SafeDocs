@@ -117,9 +117,13 @@ export default function AdminPage() {
     try {
       await deleteUser(userId)
       alert("Usuario eliminado exitosamente")
+      // Refrescar la lista de usuarios
+      await fetchData()
     } catch (error) {
       console.error("Error deleting user:", error)
-      alert(error instanceof Error ? error.message : "Error al eliminar el usuario")
+      // Mostrar el mensaje de error más específico
+      const errorMessage = error instanceof Error ? error.message : "Error al eliminar el usuario"
+      alert(`Error: ${errorMessage}`)
     }
   }
 

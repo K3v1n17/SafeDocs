@@ -121,12 +121,13 @@ class CookieAuthService implements IAuthService {
   
   async login(data: LoginData): Promise<AuthResponse> {
     try {
-      console.log('🔐 AuthService - Enviando login al backend (cookies):', data);
+      console.log('🔐 AuthService - Enviando login al backend (cookies):', { email: data.email });
       
       // El backend configurará las cookies automáticamente
       const response = await apiClient.post('/auth/login', data)
       console.log('🔐 AuthService - Respuesta completa del backend:', response);
       
+      // Verificar si la respuesta tiene éxito
       if (response.success && response.data) {
         const { user } = response.data;
         console.log('🔐 AuthService - Usuario extraído:', user);
@@ -139,10 +140,11 @@ class CookieAuthService implements IAuthService {
             user, 
             session: {} as AuthSession  // Sesión vacía por compatibilidad
           };
-          console.log('🔐 AuthService - Resultado final:', result);
+          console.log('🔐 AuthService - Login exitoso, resultado final:', result);
           return result;
         } else {
           // Usuario registrado pero necesita confirmar email
+          console.log('🔐 AuthService - Usuario necesita confirmar email');
           return { 
             user, 
             session: null, 
@@ -151,17 +153,55 @@ class CookieAuthService implements IAuthService {
         }
       }
       
+      // Si llegamos aquí, significa que el login falló
+      console.error('🔐 AuthService - Login fallido. Respuesta del backend:', response);
+      
+      // Mejorar el manejo de errores específicos
+      let errorMessage = 'Error en el login';
+      
+      if (response.error) {
+        const error = response.error.toLowerCase();
+        console.log('🔐 AuthService - Error detectado:', error);
+        
+        if (error.includes('invalid login credentials') || error.includes('credenciales inválidas')) {
+          errorMessage = 'Email o contraseña incorrectos';
+        } else if (error.includes('email not confirmed')) {
+          errorMessage = 'Por favor confirma tu email antes de iniciar sesión';
+        } else if (error.includes('too many requests')) {
+          errorMessage = 'Demasiados intentos de login. Intenta más tarde';
+        } else {
+          errorMessage = response.error;
+        }
+      } else if (!response.success) {
+        // Si no hay campo de error pero success es false
+        errorMessage = 'Credenciales incorrectas';
+      }
+      
+      console.error('🔐 AuthService - Retornando error:', errorMessage);
       return { 
         user: null, 
         session: null, 
-        error: response.error || 'Error en el login' 
+        error: errorMessage 
       }
     } catch (error) {
-      console.error('Login error:', error)
+      console.error('🔐 AuthService - Excepción en login:', error)
+      
+      // Mejorar el manejo de errores de conexión
+      let errorMessage = 'Error de conexión';
+      if (error instanceof Error) {
+        if (error.message.includes('timeout')) {
+          errorMessage = 'Tiempo de espera agotado. Verifica tu conexión';
+        } else if (error.message.includes('fetch')) {
+          errorMessage = 'No se pudo conectar con el servidor';
+        } else {
+          errorMessage = error.message;
+        }
+      }
+      
       return { 
         user: null, 
         session: null, 
-        error: 'Error de conexión' 
+        error: errorMessage 
       }
     }
   }

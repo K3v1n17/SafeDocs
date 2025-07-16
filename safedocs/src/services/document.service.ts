@@ -264,20 +264,26 @@ class DocumentService implements IDocumentService {
    */
   async deleteDocument(id: string): Promise<{ success: boolean; error?: string }> {
     try {
+      console.log(`🗑️ Eliminando documento: ${id}`)
       const response = await apiClient.delete(`${this.baseEndpoint}/${id}`)
       
-      if (response.success) {
+      console.log('🗑️ Respuesta de eliminación:', response)
+      
+      // Manejo más flexible de respuestas exitosas
+      if (response.success !== false) {
+        console.log('✅ Documento eliminado exitosamente')
         return {
           success: true
         }
       }
       
+      console.log('❌ Error al eliminar documento:', response.error)
       return {
         success: false,
         error: response.error || 'Error al eliminar documento'
       }
     } catch (error: any) {
-      console.error('Error deleting document:', error)
+      console.error('💥 Error deleting document:', error)
       return {
         success: false,
         error: error.message || 'Error al eliminar documento'

@@ -39,22 +39,45 @@ export function LoginForm() {
     setLoginError(null); 
     
     try {
+      console.log('🔐 LoginForm - Iniciando proceso de login...');
       await signInWithEmail(data.email, data.password);
+      console.log('🔐 LoginForm - Login exitoso');
       toast.success('Inicio de sesión exitoso');
       
       // Redirigir al dashboard después del login exitoso
       router.push('/overview');
     } catch (error: any) {
-      if (error.message.includes('Invalid login credentials')) {
-        setLoginError('Credenciales inválidas. Por favor verifica tu correo y contraseña.');
-        toast.error('Error al iniciar sesión: "Invalid login credentials"');
-      } else if (error.message.includes('Email not confirmed')) {
-        setLoginError('Correo electrónico no confirmado. Por favor verifica tu bandeja de entrada.');
-        toast.error('Error al iniciar sesión: "Email not confirmed"');
-      } else {
-        setLoginError(`Error: ${error.message || "Desconocido"}`);
-        toast.error(`Error al iniciar sesión: "${error.message || "Desconocido"}"`);
+      console.error('🔐 LoginForm - Error al iniciar sesión:', error);
+      
+      // Mejorar el manejo de errores específicos
+      let errorMessage = 'Error al iniciar sesión';
+      
+      if (error.message) {
+        const message = error.message.toLowerCase();
+        console.log('🔐 LoginForm - Mensaje de error recibido:', message);
+        
+        if (message.includes('email o contraseña incorrectos') || 
+            message.includes('invalid login credentials') || 
+            message.includes('credenciales inválidas') ||
+            message.includes('credenciales incorrectas')) {
+          errorMessage = 'Email o contraseña incorrectos. Verifica tus credenciales.';
+        } else if (message.includes('email not confirmed') || 
+                   message.includes('confirma tu email')) {
+          errorMessage = 'Por favor confirma tu email antes de iniciar sesión.';
+        } else if (message.includes('timeout') || 
+                   message.includes('tiempo de espera')) {
+          errorMessage = 'Tiempo de espera agotado. Verifica tu conexión a internet.';
+        } else if (message.includes('connection') || 
+                   message.includes('conexión')) {
+          errorMessage = 'No se pudo conectar con el servidor. Intenta más tarde.';
+        } else {
+          errorMessage = error.message;
+        }
       }
+      
+      console.log('🔐 LoginForm - Mostrando error:', errorMessage);
+      setLoginError(errorMessage);
+      toast.error(errorMessage);
     }
   };
 

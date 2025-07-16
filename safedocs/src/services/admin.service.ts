@@ -138,28 +138,45 @@ class AdminService {
    */
   async deleteUser(userId: string): Promise<AdminActionResponse> {
     try {
+      console.log(`🗑️ Intentando eliminar usuario: ${userId}`)
+      
       // Agregar endpoint para eliminar usuarios si no existe
       const response = await apiClient.delete(`${this.baseURL}/admin/users/${userId}`)
       
+      console.log('🗑️ Respuesta del servidor:', response)
+      
+      // Si la respuesta es exitosa (sin importar el formato exacto)
       if (response.success !== false) {
+        console.log('✅ Usuario eliminado exitosamente')
         return {
           success: true,
-          data: response
+          data: response.data || response || { message: 'Usuario eliminado exitosamente' }
         }
       }
       
+      // Si hay un error específico en la respuesta
+      console.log('❌ Error en la respuesta:', response)
       return {
         success: false,
         error: (response as any).error || (response as any).message || 'Error al eliminar el usuario'
       }
     } catch (error: any) {
-      console.error('Error deleting user:', error)
+      console.error('💥 Error en deleteUser:', error)
       
       // Si es 404, significa que el endpoint no existe
       if (error.response?.status === 404) {
         return {
           success: false,
           error: 'Funcionalidad de eliminación no implementada en el backend'
+        }
+      }
+      
+      // Para otros errores HTTP pero que pueden ser exitosos (como 200, 204)
+      if (error.response?.status >= 200 && error.response?.status < 300) {
+        console.log('✅ Usuario eliminado exitosamente (status code exitoso)')
+        return {
+          success: true,
+          data: { message: 'Usuario eliminado exitosamente' }
         }
       }
       

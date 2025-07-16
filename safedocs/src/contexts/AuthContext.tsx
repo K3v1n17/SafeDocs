@@ -111,8 +111,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const response: AuthResponse = await authService.login({ email, password });
       console.log('🔐 AuthContext - Respuesta del authService:', response);
       
+      // Verificar si hay error en la respuesta
       if (response.error) {
+        console.error('🔐 AuthContext - Error en login:', response.error);
         throw new Error(response.error);
+      }
+      
+      // Verificar si no hay usuario (login fallido)
+      if (!response.user) {
+        console.error('🔐 AuthContext - Login fallido: no hay usuario en la respuesta');
+        throw new Error('Credenciales incorrectas');
       }
       
       // Los datos ya están en la estructura correcta desde authService
@@ -122,28 +130,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.log('🔐 AuthContext - Usuario extraído:', user);
       console.log('🔐 AuthContext - Sesión extraída (cookies):', session);
       
-      if (user) {
-        setUser(user);
-        
-        // Con cookies HttpOnly, la sesión es solo indicativa
-        const fakeSession = {
-          access_token: 'managed_by_cookies',
-          refresh_token: 'managed_by_cookies',
-          expires_at: undefined
-        };
-        setSession(fakeSession);
-        console.log('🔐 AuthContext - Estados actualizados correctamente');
-        
-        return { user };
-      } else {
-        console.error('🔐 AuthContext - No se pudo extraer usuario');
-        throw new Error('Error en la autenticación: datos incompletos');
-      }
+      setUser(user);
+      
+      // Con cookies HttpOnly, la sesión es solo indicativa
+      const fakeSession = {
+        access_token: 'managed_by_cookies',
+        refresh_token: 'managed_by_cookies',
+        expires_at: undefined
+      };
+      setSession(fakeSession);
+      console.log('🔐 AuthContext - Estados actualizados correctamente');
+      
+      return { user };
     } catch (error: any) {
-      console.error('Error al iniciar sesión:', error.message);
+      console.error('🔐 AuthContext - Error en signInWithEmail:', error);
+      
       // Limpiar estados en caso de error
       setUser(null);
       setSession(null);
+      
+      // Propagar el error al componente
       throw error;
     } finally {
       setLoading(false);
