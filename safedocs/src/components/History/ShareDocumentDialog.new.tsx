@@ -145,22 +145,18 @@ export function ShareDocumentDialog({
 
     setLoading(true);
     try {
-      console.log('Enviando datos para compartir:', formData);
       const result = await documentShareService.shareDocument(formData);
-      console.log('Resultado del servicio:', result);
       
-      // Verificar si la respuesta es exitosa
-      if (result && (result.success === true || result.success === undefined)) {
-        setShareToken(result.share_token || '');
+      if (result.success) {
+        setShareToken(result.share_token);
         setStep("success");
         toast.success("Documento compartido exitosamente");
       } else {
-        console.error('Error en respuesta:', result);
-        toast.error(result?.message || "Error al compartir el documento");
+        toast.error(result.message || "Error al compartir el documento");
       }
     } catch (error) {
       console.error("Error sharing document:", error);
-      toast.error(error instanceof Error ? error.message : "Error al compartir el documento");
+      toast.error("Error al compartir el documento");
     } finally {
       setLoading(false);
     }

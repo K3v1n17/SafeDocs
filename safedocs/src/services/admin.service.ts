@@ -6,7 +6,7 @@ export interface AdminUser {
   email: string
   name?: string
   username?: string
-  role: 'owner' | 'admin'
+  role: 'owner' | 'admin' | 'auditor' | 'recipient'
   email_confirmed: boolean
   created_at: string
   updated_at: string
@@ -34,59 +34,80 @@ class AdminService {
     try {
       const response = await apiClient.get(`${this.baseURL}/admin/users`)
       
-      // Verificar la estructura de respuesta del backend
-      if (response.success !== false && (response as any).users) {
-        // Mapear los datos del endpoint a la estructura esperada
-        const users: AdminUser[] = (response as any).users.map((user: any) => ({
-          id: user.id,
-          email: user.email || `user-${user.id}@example.com`, // Placeholder si no hay email
-          name: user.name || user.username || 'Usuario',
-          username: user.username || user.id,
-          role: user.role as 'owner' | 'admin',
-          email_confirmed: true, // Asumimos que están confirmados si tienen rol
-          created_at: user.roleAssignedAt || new Date().toISOString(),
-          updated_at: user.roleUpdatedAt || new Date().toISOString()
-        }))
+      console.log('📋 Respuesta del backend:', response)
+      
+      // Verificar si la respuesta es exitosa
+      if (response.success && response.data) {
+        // Verificar si la respuesta tiene el formato esperado del backend
+        if ((response.data as any).users && Array.isArray((response.data as any).users)) {
+          // Mapear los datos del endpoint a la estructura esperada
+          const users: AdminUser[] = (response.data as any).users.map((user: any) => ({
+            id: user.id,
+            email: user.email || `user-${user.id}@example.com`,
+            name: user.name || user.username || `Usuario ${user.id}`,
+            username: user.username || user.id,
+            role: user.role as 'owner' | 'admin' | 'auditor' | 'recipient',
+            email_confirmed: true, // Asumimos que están confirmados si tienen rol
+            created_at: user.roleAssignedAt || new Date().toISOString(),
+            updated_at: user.roleUpdatedAt || new Date().toISOString()
+          }))
+          
+          return {
+            success: true,
+            data: users
+          }
+        }
         
-        return {
-          success: true,
-          data: users
+        // Si response.data es directamente un array de usuarios
+        if (Array.isArray(response.data)) {
+          const users: AdminUser[] = response.data.map((user: any) => ({
+            id: user.id,
+            email: user.email || `user-${user.id}@example.com`,
+            name: user.name || user.username || `Usuario ${user.id}`,
+            username: user.username || user.id,
+            role: user.role as 'owner' | 'admin' | 'auditor' | 'recipient',
+            email_confirmed: true,
+            created_at: user.roleAssignedAt || new Date().toISOString(),
+            updated_at: user.roleUpdatedAt || new Date().toISOString()
+          }))
+          
+          return {
+            success: true,
+            data: users
+          }
         }
       }
       
-      // Si no hay campo 'users' pero hay 'data', intentar usar ese
-      if (response.data && Array.isArray(response.data)) {
-        const users: AdminUser[] = response.data.map((user: any) => ({
-          id: user.id,
-          email: user.email || `user-${user.id}@example.com`,
-          name: user.name || user.username || 'Usuario',
-          username: user.username || user.id,
-          role: user.role as 'owner' | 'admin',
-          email_confirmed: true,
-          created_at: user.roleAssignedAt || new Date().toISOString(),
-          updated_at: user.roleUpdatedAt || new Date().toISOString()
-        }))
-        
-        return {
-          success: true,
-          data: users
-        }
-      }
-      
-      // Si la respuesta no tiene success: false, pero tampoco tiene users
-      if ((response as any).error || (response as any).message) {
+      // Si hay error en la respuesta
+      if (response.error) {
         return {
           success: false,
-          error: (response as any).error || (response as any).message || 'Error al obtener usuarios'
+          error: response.error || 'Error al obtener usuarios'
         }
       }
       
       return {
         success: false,
-        error: 'Estructura de respuesta inesperada'
+        error: 'No se encontraron usuarios o estructura de respuesta inesperada'
       }
     } catch (error: any) {
-      console.error('Error fetching users:', error)
+      console.error('💥 Error fetching users:', error)
+      
+      // Manejo específico de errores HTTP
+      if (error.response?.status === 403) {
+        return {
+          success: false,
+          error: 'Acceso denegado. Solo administradores pueden ver todos los usuarios.'
+        }
+      }
+      
+      if (error.response?.status === 401) {
+        return {
+          success: false,
+          error: 'Token inválido o expirado. Por favor, inicia sesión nuevamente.'
+        }
+      }
+      
       return {
         success: false,
         error: error.response?.data?.message || error.message || 'Error al obtener usuarios'
@@ -97,26 +118,33 @@ class AdminService {
   /**
    * 🔄 Actualizar rol de usuario (usando tu endpoint existente)
    */
+  /**
+   * 🔄 Actualizar rol de usuario (usando tu endpoint existente)
+   */
   async updateUserRole(userId: string, newRole: string): Promise<AdminActionResponse> {
     try {
+      console.log(`🔄 Actualizando rol de usuario ${userId} a ${newRole}`)
+      
       const response = await apiClient.post(`${this.baseURL}/admin/assign-role`, {
         userId: userId,
         role: newRole
       })
       
+      console.log('🔄 Respuesta del servidor:', response)
+      
       // Verificar si la respuesta es exitosa
-      if (response.success !== false && (response as any).message) {
+      if (response.success) {
         return {
           success: true,
-          data: response
+          data: response.data || { message: 'Rol asignado exitosamente' }
         }
       }
       
       // Si hay error en la respuesta
-      if ((response as any).error || (response as any).message) {
+      if (response.error) {
         return {
           success: false,
-          error: (response as any).error || (response as any).message || 'Error al actualizar el rol'
+          error: response.error || 'Error al actualizar el rol'
         }
       }
       
@@ -125,7 +153,30 @@ class AdminService {
         error: 'Error al actualizar el rol'
       }
     } catch (error: any) {
-      console.error('Error updating user role:', error)
+      console.error('💥 Error updating user role:', error)
+      
+      // Manejo específico de errores HTTP
+      if (error.response?.status === 403) {
+        return {
+          success: false,
+          error: 'Acceso denegado. Solo administradores pueden cambiar roles.'
+        }
+      }
+      
+      if (error.response?.status === 401) {
+        return {
+          success: false,
+          error: 'Token inválido o expirado. Por favor, inicia sesión nuevamente.'
+        }
+      }
+      
+      if (error.response?.status === 400) {
+        return {
+          success: false,
+          error: 'Rol inválido. Los roles válidos son: owner, admin, auditor, recipient'
+        }
+      }
+      
       return {
         success: false,
         error: error.response?.data?.message || error.message || 'Error al actualizar el rol'

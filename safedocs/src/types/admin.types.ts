@@ -4,7 +4,7 @@ export interface AdminUser {
   email: string
   name?: string
   username?: string
-  role: 'owner' | 'admin'
+  role: 'owner' | 'admin' | 'auditor' | 'recipient'
   email_confirmed: boolean
   created_at: string
   updated_at: string

@@ -26,7 +26,9 @@ import {
   Edit,
   Trash2,
   Crown,
-  User
+  User,
+  Eye,
+  FileCheck
 } from "lucide-react"
 import Loading from "@/components/ui/Loading"
 import { useAdminData } from "@/hooks/useAdminData"
@@ -50,11 +52,15 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 const ROLES = [
   { value: 'owner', label: 'Usuario Regular', icon: User, color: 'bg-blue-500' },
   { value: 'admin', label: 'Administrador', icon: Crown, color: 'bg-red-500' },
+  { value: 'auditor', label: 'Auditor', icon: Shield, color: 'bg-green-500' },
+  { value: 'recipient', label: 'Destinatario', icon: Eye, color: 'bg-purple-500' },
 ]
 
 const ROLE_PERMISSIONS = {
   owner: ['document:read', 'document:write', 'document:share'],
-  admin: ['document:read', 'document:write', 'document:share', 'user:manage', 'system:admin']
+  admin: ['document:read', 'document:write', 'document:share', 'user:manage', 'system:admin'],
+  auditor: ['document:read', 'document:audit', 'system:audit'],
+  recipient: ['document:read', 'document:receive']
 }
 
 export default function AdminPage() {
@@ -215,13 +221,15 @@ export default function AdminPage() {
           
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Usuarios Inactivos</CardTitle>
-              <UserX className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-sm font-medium">Auditores</CardTitle>
+              <Shield className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stats.inactiveUsers}</div>
+              <div className="text-2xl font-bold">
+                {users.filter(u => u.role === 'auditor').length}
+              </div>
               <p className="text-xs text-muted-foreground">
-                pendientes de confirmación
+                usuarios auditores
               </p>
             </CardContent>
           </Card>
@@ -318,7 +326,11 @@ export default function AdminPage() {
                       <TableCell>{userItem.email}</TableCell>
                       
                       <TableCell>
-                        <Badge variant={userItem.role === 'admin' ? 'destructive' : 'default'}>
+                        <Badge variant={
+                          userItem.role === 'admin' ? 'destructive' : 
+                          userItem.role === 'auditor' ? 'secondary' :
+                          userItem.role === 'recipient' ? 'outline' : 'default'
+                        }>
                           {roleInfo.label}
                         </Badge>
                       </TableCell>
@@ -341,24 +353,29 @@ export default function AdminPage() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem 
-                              onClick={() => handleRoleChange(
-                                userItem.id, 
-                                userItem.role === 'admin' ? 'owner' : 'admin'
-                              )}
-                            >
-                              <Edit className="h-4 w-4 mr-2" />
-                              {userItem.role === 'admin' ? 'Quitar Admin' : 'Hacer Admin'}
-                            </DropdownMenuItem>
+                            {ROLES.map((role) => {
+                              if (role.value === userItem.role) return null; // No mostrar el rol actual
+                              return (
+                                <DropdownMenuItem 
+                                  key={role.value}
+                                  onClick={() => handleRoleChange(userItem.id, role.value)}
+                                >
+                                  <role.icon className="h-4 w-4 mr-2" />
+                                  Cambiar a {role.label}
+                                </DropdownMenuItem>
+                              );
+                            })}
                             
                             {userItem.id !== user.id && (
-                              <DropdownMenuItem 
-                                className="text-red-600"
-                                onClick={() => handleDeleteUser(userItem.id, userItem.email)}
-                              >
-                                <Trash2 className="h-4 w-4 mr-2" />
-                                Eliminar Usuario
-                              </DropdownMenuItem>
+                              <>
+                                <DropdownMenuItem 
+                                  className="text-red-600 border-t mt-1 pt-1"
+                                  onClick={() => handleDeleteUser(userItem.id, userItem.email)}
+                                >
+                                  <Trash2 className="h-4 w-4 mr-2" />
+                                  Eliminar Usuario
+                                </DropdownMenuItem>
+                              </>
                             )}
                           </DropdownMenuContent>
                         </DropdownMenu>

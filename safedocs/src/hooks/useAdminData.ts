@@ -80,15 +80,13 @@ export const useAdminData = (): UseAdminDataReturn => {
       }
 
       // Actualizar el usuario en el estado local
-      setUsers(prevUsers => 
-        prevUsers.map(u => 
-          u.id === userId ? { ...u, role: newRole as 'owner' | 'admin' } : u
-        )
-      )
-
-      // Recalcular estadísticas
+        setUsers(prevUsers => 
+          prevUsers.map(u => 
+            u.id === userId ? { ...u, role: newRole as 'owner' | 'admin' | 'auditor' | 'recipient' } : u
+          )
+        )      // Recalcular estadísticas
       const updatedUsers = users.map(u => 
-        u.id === userId ? { ...u, role: newRole as 'owner' | 'admin' } : u
+        u.id === userId ? { ...u, role: newRole as 'owner' | 'admin' | 'auditor' | 'recipient' } : u
       )
       const totalUsers = updatedUsers.length
       const adminUsers = updatedUsers.filter(u => u.role === 'admin').length

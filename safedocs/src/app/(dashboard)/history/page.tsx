@@ -22,6 +22,9 @@ import { ActivityHistory } from "@/components/History/ActivityHistory"
 import { ShareDocumentDialog } from "@/components/History/ShareDocumentDialog"
 import { SharedDocumentsCard } from "@/components/History/SharedDocumentsCard"
 import { ManageDocumentSharesDialog } from "@/components/History/ManageDocumentSharesDialog"
+import { SharedDocumentsList } from "@/components/History/SharedDocumentsList"
+import { MySharedDocuments } from "@/components/History/MySharedDocuments"
+import { DocumentShareStats } from "@/components/History/DocumentShareStats"
 
 interface EditingDocument {
   title: string
@@ -52,6 +55,7 @@ export default function HistoryPage() {
   const [loadingShared, setLoadingShared] = useState(false)
   const [manageSharesOpen, setManageSharesOpen] = useState(false)
   const [documentToManage, setDocumentToManage] = useState<Document | null>(null)
+  const [activeTab, setActiveTab] = useState<"my-docs" | "shared-with-me" | "my-shared">("my-docs")
 
   // Usar el hook personalizado para manejar los datos
   const {
@@ -266,82 +270,92 @@ export default function HistoryPage() {
           verifications={actionCounts.verify || 0}
         />
 
-        {/* Documents Management */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Mis Documentos</CardTitle>
-            <CardDescription>{documents.length} documentos en total</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {documents.map((doc) => (
-                <DocumentCard
-                  key={doc.id}
-                  document={doc}
-                  isExpanded={expandedDoc === doc.id}
-                  isEditing={editingDoc === doc.id}
-                  editingData={editingData}
-                  documentTypes={documentTypes}
-                  onToggleExpand={() => setExpandedDoc(expandedDoc === doc.id ? null : doc.id)}
-                  onStartEdit={() => startEdit(doc)}
-                  onSaveEdit={() => handleEditDocument(doc.id)}
-                  onCancelEdit={cancelEdit}
-                  onDelete={() => handleDeleteDocument(doc.id, doc.title)}
-                  onShare={() => handleShareDocument(doc)}
-                  onManageShares={() => handleManageShares(doc)}
-                  setEditingData={setEditingData}
-                  formatFileSize={formatFileSize}
-                  getMimeTypeIcon={getMimeTypeIcon}
-                />
-              ))}
+        {/* Document Share Stats */}
+        <DocumentShareStats className="mb-6" />
 
-              {documents.length === 0 && (
-                <div className="text-center py-12 text-muted-foreground">
-                  <FileText className="mx-auto h-16 w-16 mb-4 opacity-50" />
-                  <h3 className="text-lg font-medium mb-2">No tienes documentos subidos</h3>
-                  <p className="text-sm">Sube tu primer documento para comenzar</p>
-                </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
+        {/* Tabs de navegación */}
+        <div className="flex space-x-1 rounded-lg bg-gray-100 p-1">
+          <button
+            onClick={() => setActiveTab("my-docs")}
+            className={`flex-1 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+              activeTab === "my-docs"
+                ? "bg-white text-gray-900 shadow-sm"
+                : "text-gray-500 hover:text-gray-700"
+            }`}
+          >
+            Mis Documentos
+          </button>
+          <button
+            onClick={() => setActiveTab("shared-with-me")}
+            className={`flex-1 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+              activeTab === "shared-with-me"
+                ? "bg-white text-gray-900 shadow-sm"
+                : "text-gray-500 hover:text-gray-700"
+            }`}
+          >
+            Compartidos Conmigo
+          </button>
+          <button
+            onClick={() => setActiveTab("my-shared")}
+            className={`flex-1 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+              activeTab === "my-shared"
+                ? "bg-white text-gray-900 shadow-sm"
+                : "text-gray-500 hover:text-gray-700"
+            }`}
+          >
+            Mis Compartidos
+          </button>
+        </div>
 
-        {/* Documentos Compartidos Conmigo */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Documentos Compartidos Conmigo</CardTitle>
-            <CardDescription>
-              {loadingShared 
-                ? "Cargando..." 
-                : `${sharedDocuments.length} documentos compartidos`
-              }
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {loadingShared ? (
-                <div className="text-center py-8">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-                  <p className="text-sm text-gray-500 mt-2">Cargando documentos compartidos...</p>
-                </div>
-              ) : sharedDocuments.length > 0 ? (
-                sharedDocuments.map((sharedDoc) => (
-                  <SharedDocumentsCard
-                    key={sharedDoc.id}
-                    sharedDocument={sharedDoc}
-                    onViewDocument={handleViewSharedDocument}
+        {/* Contenido según tab activo */}
+        {activeTab === "my-docs" && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Mis Documentos</CardTitle>
+              <CardDescription>{documents.length} documentos en total</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {documents.map((doc) => (
+                  <DocumentCard
+                    key={doc.id}
+                    document={doc}
+                    isExpanded={expandedDoc === doc.id}
+                    isEditing={editingDoc === doc.id}
+                    editingData={editingData}
+                    documentTypes={documentTypes}
+                    onToggleExpand={() => setExpandedDoc(expandedDoc === doc.id ? null : doc.id)}
+                    onStartEdit={() => startEdit(doc)}
+                    onSaveEdit={() => handleEditDocument(doc.id)}
+                    onCancelEdit={cancelEdit}
+                    onDelete={() => handleDeleteDocument(doc.id, doc.title)}
+                    onShare={() => handleShareDocument(doc)}
+                    onManageShares={() => handleManageShares(doc)}
+                    setEditingData={setEditingData}
+                    formatFileSize={formatFileSize}
+                    getMimeTypeIcon={getMimeTypeIcon}
                   />
-                ))
-              ) : (
-                <div className="text-center py-12 text-muted-foreground">
-                  <FileText className="mx-auto h-16 w-16 mb-4 opacity-50" />
-                  <h3 className="text-lg font-medium mb-2">No tienes documentos compartidos</h3>
-                  <p className="text-sm">Los documentos que otros usuarios compartan contigo aparecerán aquí</p>
-                </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
+                ))}
+
+                {documents.length === 0 && (
+                  <div className="text-center py-12 text-muted-foreground">
+                    <FileText className="mx-auto h-16 w-16 mb-4 opacity-50" />
+                    <h3 className="text-lg font-medium mb-2">No tienes documentos subidos</h3>
+                    <p className="text-sm">Sube tu primer documento para comenzar</p>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {activeTab === "shared-with-me" && (
+          <SharedDocumentsList />
+        )}
+
+        {activeTab === "my-shared" && (
+          <MySharedDocuments />
+        )}
 
         {/* Filters */}
         <DocumentFilters
