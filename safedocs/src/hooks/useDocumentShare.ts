@@ -116,14 +116,27 @@ export function useDocumentShare() {
   /**
    * Abre un documento compartido
    */
-  const openSharedDocument = useCallback(async (shareToken: string) => {
+  const openSharedDocument = useCallback(async (shareToken: string, showPreview: boolean = true) => {
     try {
       const sharedDoc = await documentShareService.getSharedDocument(shareToken);
       
-      if (sharedDoc.document.signed_file_url) {
-        window.open(sharedDoc.document.signed_file_url, '_blank');
-        toast.success('Documento abierto en nueva ventana');
-        return sharedDoc;
+      if (sharedDoc && sharedDoc.document?.signed_file_url) {
+        if (showPreview) {
+          // Retornar los datos para que el componente pueda mostrar la previsualización
+          return {
+            success: true,
+            data: sharedDoc,
+            previewUrl: sharedDoc.document.signed_file_url,
+            documentTitle: sharedDoc.document.title || sharedDoc.share?.title || 'Documento compartido',
+            documentType: sharedDoc.document.mime_type,
+            shareToken: shareToken
+          };
+        } else {
+          // Comportamiento original: abrir en nueva ventana
+          window.open(sharedDoc.document.signed_file_url, '_blank');
+          toast.success('Documento abierto en nueva ventana');
+          return sharedDoc;
+        }
       } else {
         toast.error('No se pudo obtener la URL del documento');
         throw new Error('No se pudo obtener la URL del documento');

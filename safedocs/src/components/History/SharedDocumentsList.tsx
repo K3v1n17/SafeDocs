@@ -13,10 +13,13 @@ import {
   Shield, 
   ExternalLink,
   AlertCircle,
-  RefreshCw
+  RefreshCw,
+  Eye,
+  Download
 } from "lucide-react";
 import { SharedWithMe } from "@/services/documentShare.service";
 import { useDocumentShareOperations } from "@/contexts/DocumentShareContext";
+import { DocumentViewerDialog } from "./DocumentViewerDialog";
 
 interface SharedDocumentsListProps {
   className?: string;
@@ -32,6 +35,15 @@ export function SharedDocumentsList({ className }: SharedDocumentsListProps) {
 
   const [refreshing, setRefreshing] = useState(false);
   const [hasLoaded, setHasLoaded] = useState(false);
+  
+  // Estados para el visor de documentos
+  const [viewerOpen, setViewerOpen] = useState(false);
+  const [currentDocumentUrl, setCurrentDocumentUrl] = useState<string | null>(null);
+  const [currentDocumentTitle, setCurrentDocumentTitle] = useState<string>('');
+  const [currentDocumentType, setCurrentDocumentType] = useState<string>('');
+  const [currentShareToken, setCurrentShareToken] = useState<string>('');
+  const [currentPermissionLevel, setCurrentPermissionLevel] = useState<string>('read');
+  const [loadingDocumentToken, setLoadingDocumentToken] = useState<string | false>(false);
 
   useEffect(() => {
     // Solo cargar una vez cuando el componente se monta
@@ -47,7 +59,41 @@ export function SharedDocumentsList({ className }: SharedDocumentsListProps) {
     }
   }, [hasLoaded, loadingSharedWithMe]);
 
-  // Debug: mostrar los datos actuales
+  /**
+   * Maneja la apertura de un documento compartido con previsualización
+   */
+  const handleOpenDocument = async (shareToken: string, documentTitle?: string, permissionLevel: string = 'read') => {
+    setLoadingDocumentToken(shareToken); // Usar el token para identificar cuál está cargando
+    
+    try {
+      const result = await openSharedDocument(shareToken, true); // true para mostrar previsualización
+      
+      if (result && result.success) {
+        setCurrentDocumentUrl(result.previewUrl);
+        setCurrentDocumentTitle(result.documentTitle || documentTitle || 'Documento compartido');
+        setCurrentDocumentType(result.documentType || '');
+        setCurrentShareToken(shareToken);
+        setCurrentPermissionLevel(permissionLevel);
+        setViewerOpen(true);
+      }
+    } catch (error) {
+      console.error('Error abriendo documento:', error);
+    } finally {
+      setLoadingDocumentToken(false);
+    }
+  };
+
+  /**
+   * Maneja la descarga directa de un documento
+   */
+  const handleDownloadDocument = async (shareToken: string) => {
+    try {
+      const result = await openSharedDocument(shareToken, false); // false para descarga directa
+      // La descarga se maneja automáticamente en el hook
+    } catch (error) {
+      console.error('Error descargando documento:', error);
+    }
+  };
   useEffect(() => {
     console.log('SharedDocumentsList - sharedWithMe actualizado:', sharedWithMe);
   }, [sharedWithMe]);
@@ -212,15 +258,31 @@ export function SharedDocumentsList({ className }: SharedDocumentsListProps) {
           <div className="text-xs text-muted-foreground">
             Token: {share.share_token.substring(0, 12)}...
           </div>
-          <Button
-            onClick={() => openSharedDocument(share.share_token)}
-            disabled={share.is_expired}
-            size="sm"
-            className="flex items-center gap-2"
-          >
-            <ExternalLink className="h-4 w-4" />
-            Abrir documento
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              onClick={() => handleOpenDocument(share.share_token, share.title, share.permission_level)}
+              disabled={share.is_expired || loadingDocumentToken === share.share_token}
+              size="sm"
+              className="flex items-center gap-2"
+            >
+              <Eye className="h-4 w-4" />
+              {loadingDocumentToken === share.share_token ? 'Cargando...' : 'Vista previa'}
+            </Button>
+            
+            {/* Mostrar botón de descarga solo si tiene permisos de write o admin */}
+            {(share.permission_level === 'write' || share.permission_level === 'admin') && (
+              <Button
+                onClick={() => handleDownloadDocument(share.share_token)}
+                disabled={share.is_expired}
+                size="sm"
+                variant="outline"
+                className="flex items-center gap-2"
+                title="Descargar documento"
+              >
+                <Download className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
         </div>
       </CardContent>
     </Card>
@@ -257,6 +319,18 @@ export function SharedDocumentsList({ className }: SharedDocumentsListProps) {
           {(sharedWithMe || []).map(renderDocumentCard)}
         </div>
       )}
+
+      {/* Diálogo de vista previa de documentos */}
+      <DocumentViewerDialog
+        open={viewerOpen}
+        onOpenChange={setViewerOpen}
+        documentUrl={currentDocumentUrl}
+        documentTitle={currentDocumentTitle}
+        documentType={currentDocumentType}
+        isLoading={!!loadingDocumentToken}
+        allowDownload={currentPermissionLevel === 'write' || currentPermissionLevel === 'admin'}
+        shareToken={currentShareToken}
+      />
     </div>
   );
 }
