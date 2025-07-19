@@ -38,6 +38,7 @@ interface DocumentCardProps {
   onDelete: () => void
   onShare: () => void
   onManageShares?: () => void
+  onVerify?: () => void
   setEditingData: (data: EditingDocument) => void
   formatFileSize: (bytes: number) => string
   getMimeTypeIcon: (mimeType: string) => string
@@ -56,6 +57,7 @@ export function DocumentCard({
   onDelete,
   onShare,
   onManageShares,
+  onVerify,
   setEditingData,
   formatFileSize,
   getMimeTypeIcon,
@@ -188,6 +190,12 @@ export function DocumentCard({
                     <Button size="sm" variant="outline" onClick={onManageShares}>
                       <Users className="h-4 w-4 mr-2" />
                       Gestionar
+                    </Button>
+                  )}
+                  {onVerify && (
+                    <Button size="sm" variant="outline" onClick={onVerify}>
+                      <File className="h-4 w-4 mr-2" />
+                      Verificar
                     </Button>
                   )}
                   <Button size="sm" variant="destructive" onClick={onDelete}>

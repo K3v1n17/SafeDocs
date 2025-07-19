@@ -12,9 +12,11 @@ import { toast } from "sonner"
 
 import { useHistoryData } from "@/hooks/useHistoryData"
 import { Document } from "@/services"
+import { documentService } from "@/services/document.service"
 import { documentShareService, SharedWithMe } from "@/services/documentShare.service"
 
 // Componentes
+import { VerifyDocumentDialog } from "@/components/History/VerifyDocumentDialog"
 import { StatsCards } from "@/components/History/StatsCards"
 import { DocumentCard } from "@/components/History/DocumentCard"
 import { DocumentFilters } from "@/components/History/DocumentFilters"
@@ -56,6 +58,18 @@ export default function HistoryPage() {
   const [manageSharesOpen, setManageSharesOpen] = useState(false)
   const [documentToManage, setDocumentToManage] = useState<Document | null>(null)
   const [activeTab, setActiveTab] = useState<"my-docs" | "shared-with-me" | "my-shared">("my-docs")
+  
+  // Estado para el diálogo de verificación
+  const [verifyDialogOpen, setVerifyDialogOpen] = useState(false)
+  const [verificationResult, setVerificationResult] = useState<{
+    isVerified: boolean;
+    verificationDetails?: {
+      documentId: string;
+      isValid: boolean;
+      message: string;
+    };
+  } | null>(null)
+  const [documentToVerify, setDocumentToVerify] = useState<Document | null>(null)
 
   // Usar el hook personalizado para manejar los datos
   const {
@@ -163,6 +177,46 @@ export default function HistoryPage() {
   const handleManageShares = (doc: Document) => {
     setDocumentToManage(doc)
     setManageSharesOpen(true)
+  }
+
+  const handleVerifyDocument = async (doc: Document) => {
+    try {
+      setDocumentToVerify(doc);
+      const result = await documentService.verifyDocument(doc.id);
+      
+      if (result.success && result.data) {
+        setVerificationResult({
+          isVerified: result.data.isValid,
+          verificationDetails: {
+            documentId: result.data.documentId,
+            isValid: result.data.isValid,
+            message: result.data.message
+          }
+        });
+        setVerifyDialogOpen(true);
+      } else {
+        setVerificationResult({
+          isVerified: false,
+          verificationDetails: {
+            documentId: doc.id,
+            isValid: false,
+            message: result.error || 'Error desconocido en la verificación'
+          }
+        });
+        setVerifyDialogOpen(true);
+      }
+    } catch (error) {
+      console.error('Error al verificar el documento:', error);
+      setVerificationResult({
+        isVerified: false,
+        verificationDetails: {
+          documentId: doc.id,
+          isValid: false,
+          message: 'Error al intentar verificar el documento'
+        }
+      });
+      setVerifyDialogOpen(true);
+    }
   }
 
   const handleViewSharedDocument = async (shareToken: string) => {
@@ -331,6 +385,7 @@ export default function HistoryPage() {
                     onDelete={() => handleDeleteDocument(doc.id, doc.title)}
                     onShare={() => handleShareDocument(doc)}
                     onManageShares={() => handleManageShares(doc)}
+                    onVerify={() => handleVerifyDocument(doc)}
                     setEditingData={setEditingData}
                     formatFileSize={formatFileSize}
                     getMimeTypeIcon={getMimeTypeIcon}
@@ -388,6 +443,16 @@ export default function HistoryPage() {
           onOpenChange={setManageSharesOpen}
           documentId={documentToManage.id}
           documentTitle={documentToManage.title}
+        />
+      )}
+
+      {/* Verify Document Dialog */}
+      {documentToVerify && verificationResult && (
+        <VerifyDocumentDialog
+          open={verifyDialogOpen}
+          onOpenChange={setVerifyDialogOpen}
+          verificationResult={verificationResult}
+          documentTitle={documentToVerify.title}
         />
       )}
     </div>

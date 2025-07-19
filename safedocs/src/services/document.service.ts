@@ -47,6 +47,16 @@ export interface DocumentUploadResponse {
   error?: string
 }
 
+export interface VerifyDocumentResponse {
+  success: boolean
+  data: {
+    documentId: string;
+    isValid: boolean;
+    message: string;
+  }
+  error?: string
+}
+
 export interface IDocumentService {
   getDocuments(filters?: DocumentFilters, page?: number, limit?: number): Promise<DocumentsResponse>
   getDocument(id: string): Promise<DocumentResponse>
@@ -56,6 +66,7 @@ export interface IDocumentService {
   downloadDocument(id: string): Promise<Blob>
   shareDocument(id: string, isPublic: boolean): Promise<DocumentResponse>
   searchDocuments(query: string, filters?: DocumentFilters): Promise<DocumentsResponse>
+  verifyDocument(id: string): Promise<VerifyDocumentResponse>
 }
 
 class DocumentService implements IDocumentService {
@@ -405,6 +416,48 @@ class DocumentService implements IDocumentService {
           limit: 20
         },
         error: error.message || 'Error al buscar documentos'
+      }
+    }
+  }
+
+  /**
+   * ✅ Verificar documento
+   */
+  async verifyDocument(id: string): Promise<VerifyDocumentResponse> {
+    try {
+      console.log(`🔐 DocumentService - Verificando documento: ${id}`)
+      const response = await apiClient.post(`${this.baseEndpoint}/${id}/verify`)
+      
+      if (response.success && response.data) {
+        return {
+          success: true,
+          data: {
+            documentId: response.data.documentId,
+            isValid: response.data.isValid,
+            message: response.data.message
+          }
+        }
+      }
+      
+      return {
+        success: false,
+        data: {
+            documentId: 'desconocido',
+            isValid: false,
+            message: 'error'
+        },
+        error: response.error || 'Error al verificar documento'
+      }
+    } catch (error: any) {
+      console.error('Error verifying document:', error)
+      return {
+        success: false,
+        data: {
+            documentId: 'desconocido',
+            isValid: false,
+            message: error.message || 'Error en la verificación'
+        },
+        error: error.message || 'Error al verificar documento'
       }
     }
   }
