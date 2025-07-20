@@ -22,7 +22,7 @@ interface DocumentShareContextType {
   loadMySharedDocuments: () => Promise<DocumentShare[]>;
   shareDocument: (shareData: CreateSimpleShare) => Promise<any>;
   revokeShare: (shareId: string) => Promise<boolean>;
-  openSharedDocument: (shareToken: string) => Promise<any>;
+  openSharedDocument: (shareToken: string, showPreview?: boolean) => Promise<any>;
   checkDocumentPermission: (documentId: string) => Promise<any>;
   searchUsersForSharing: (query: string) => Promise<any>;
   refreshAll: () => Promise<void>;
